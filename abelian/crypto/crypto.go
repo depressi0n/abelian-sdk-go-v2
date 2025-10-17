@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"fmt"
+
 	api "github.com/pqabelian/abec/sdkapi/v2"
 )
 
@@ -32,6 +33,7 @@ const (
 	PrivacyLevelFullPrivacyPre  PrivacyLevel = api.PrivacyLevelRINGCTPre // for back-compatibility
 	PrivacyLevelFullPrivacyRand              = api.PrivacyLevelRINGCT
 	PrivacyLevelPseudonym                    = api.PrivacyLevelPSEUDONYM
+	PrivacyLevelPseudonymCT                  = api.PrivacyLevelPSEUDONYMCT
 )
 
 func GetCryptoSchemeParamSeedBytesLen(cryptoScheme CryptoScheme) (int, error) {
@@ -67,13 +69,18 @@ func GenerateSeed(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel) (*Crypto
 		coinValueKeySeed := RandomBytes(underlyingSeedLen)
 		return NewRandSeeds(cryptoScheme, privacyLevel, coinAddressKeySeed, nil, coinValueKeySeed, nil, nil)
 	case CryptoSchemePQRingCTX:
-		if privacyLevel != PrivacyLevelFullPrivacyRand && privacyLevel != PrivacyLevelPseudonym {
+		if privacyLevel != PrivacyLevelFullPrivacyRand &&
+			privacyLevel != PrivacyLevelPseudonym &&
+			privacyLevel != PrivacyLevelPseudonymCT {
 			return nil, fmt.Errorf("invalid privacy level %d for crypto scheme %d", privacyLevel, cryptoScheme)
 		}
 		coinSpendKeyRootSeed := RandomBytes(underlyingSeedLen)
 		var coinSerialNumberKeyRootSeed, coinValueKeyRootSeed []byte
 		if privacyLevel == PrivacyLevelFullPrivacyRand {
 			coinSerialNumberKeyRootSeed = RandomBytes(underlyingSeedLen)
+			coinValueKeyRootSeed = RandomBytes(underlyingSeedLen)
+		}
+		if privacyLevel == PrivacyLevelPseudonymCT {
 			coinValueKeyRootSeed = RandomBytes(underlyingSeedLen)
 		}
 		coinDetectorRootKey := RandomBytes(underlyingSeedLen)
@@ -168,7 +175,9 @@ func GenerateRandSeedsByRootSeedsFromPublicRand(rootSeedBytes []byte, publicRand
 		log.Errorf("expected crypto scheme %d, but got %d ", CryptoSchemePQRingCTX, rootSeeds.cryptoScheme)
 		return nil, fmt.Errorf("expected crypto scheme %d, but got %d ", CryptoSchemePQRingCTX, rootSeeds.cryptoScheme)
 	}
-	if rootSeeds.privacyLevel != PrivacyLevelFullPrivacyRand && rootSeeds.privacyLevel != PrivacyLevelPseudonym {
+	if rootSeeds.privacyLevel != PrivacyLevelFullPrivacyRand &&
+		rootSeeds.privacyLevel != PrivacyLevelPseudonym &&
+		rootSeeds.privacyLevel != PrivacyLevelPseudonymCT {
 		log.Errorf("invalid privacy level %d for crypto scheme %d", rootSeeds.privacyLevel, rootSeeds.cryptoScheme)
 		return nil, fmt.Errorf("invalid privacy level %d for crypto scheme %d", rootSeeds.privacyLevel, rootSeeds.cryptoScheme)
 	}
@@ -360,4 +369,27 @@ func GenerateCoinSerialNumberByKeysWithRing(outPoints []*OutPoint,
 		log.Errorf("fail to generate serial number using serialized ring with keys")
 	}
 	return serialNumber, err
+}
+
+func ExtractPublicRandFromTxo(txVersion uint32, serializedTxOut []byte) ([]byte, error) {
+	return api.ExtractPublicRandFromTxo(txVersion, serializedTxOut)
+}
+
+type AutTokenType = api.AutTokenType
+
+const (
+	AutTokenTypeHidden = api.AutTokenTypeHidden
+	AutTokenTypePublic = api.AutTokenTypePublic
+)
+
+func ExtractCTAUTTokenValue(version uint32, valueScript []byte, cryptoVpk []byte, cryptoVsk []byte) (uint64, AutTokenType, error) {
+
+	value, tokenType, err := api.ExtractAutTokenValue(version, valueScript, cryptoVpk, cryptoVsk)
+	if err != nil {
+		return 0, AutTokenTypeHidden, err
+	}
+	return value, tokenType, err
+}
+func CryptoValueKeyGen(coinValueKeySeed []byte, publicRand []byte) ([]byte, []byte, error) {
+	return api.CryptoValueKeyReGenByRootSeedsFromPublicRand(api.CryptoSchemePQRingCTX, api.PrivacyLevelPSEUDONYMCT, coinValueKeySeed, publicRand)
 }

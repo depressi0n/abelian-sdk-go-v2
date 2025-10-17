@@ -4,17 +4,41 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian"
+	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/common"
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/database"
 )
 
 func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseTx bool, blockID string, blockHeight int64) error {
+	serializedTxOuts := make([][]byte, len(tx.Vout))
 	for index := 0; index < len(tx.Vout); index++ {
 		txOutData, err := hex.DecodeString(tx.Vout[index].Script)
 		if err != nil {
 			return fmt.Errorf("fail to decode output of transaction: %v", err)
 		}
+		serializedTxOuts[index] = txOutData
+	}
+
+	txMemo, err := hex.DecodeString(tx.Memo)
+	if err != nil {
+		return err
+	}
+	ctautScript, err := abelian.ParseCTAUTScript(tx.TxID, txMemo)
+	if err != nil {
+		return err
+	}
+	var tokens []*abelian.CTAUTToken
+	if ctautScript != nil {
+		tokens, err = abelian.GetGeneratedCTAUTTokens(ctautScript, tx.Version, tx.TxHash, serializedTxOuts)
+		if err != nil {
+			return err
+		}
+	}
+
+	for index := 0; index < len(serializedTxOuts); index++ {
+		txOutData := serializedTxOuts[index]
 		for _, viewAccount := range viewAccounts {
 			success, value, err := viewAccount.ReceiveCoin(uint32(tx.Version), txOutData)
 			if err != nil {
@@ -23,16 +47,92 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 			if !success {
 				continue
 			}
+			coinAddress, err := crypto.DecodeCoinAddressFromSerializedTxOutData(uint32(tx.Version), txOutData)
+			if err != nil {
+				return fmt.Errorf("fail to decode coin address from transaction output")
+			}
 
-			fmt.Printf("💰 Find coin of account with account id %d: block id %s, block height %d, transacion id %s, index %d, value %v ABELs\n",
-				viewAccount.ID, blockID, blockHeight, tx.TxHash, index, abelian.NeutrinoToAbel(int64(value)))
+			fmt.Printf("💰 Find coin of account with account id %d: block id %s, block height %d, transacion id %s, index %d, value %v ABELs to address fingerprint %s\n",
+				viewAccount.ID, blockID, blockHeight, tx.TxHash, index, abelian.NeutrinoToAbel(int64(value)), hex.EncodeToString(coinAddress.Fingerprint()))
 
 			_, err = database.InsertCoin(viewAccount.ID, tx.Version, tx.TxID, uint8(index), blockID, blockHeight, int64(value), isCoinbaseTx, txOutData)
 			if err != nil {
 				return fmt.Errorf("fail to store coin into database: %v", err)
 			}
+
+			if ctautScript != nil {
+				identifier := ctautScript.Identifier()
+				version := ctautScript.Version()
+				isRootToken := ctautScript.Type() == abelian.CTAUTTypeRegistration || ctautScript.Type() == abelian.CTAUTTypeReRegistration
+				tokenIndex := 0
+				for ; tokenIndex < len(tokens); tokenIndex++ {
+					if tokens[tokenIndex].HostOutpoint.Index == uint8(index) {
+						break
+					}
+				}
+				if tokenIndex == len(tokens) {
+					continue
+				}
+				ctAUTToken := tokens[tokenIndex]
+
+				if ctAUTToken != nil {
+					success, ctAutValue, tokenType, cryptoValuePK, cryptoValueSK, err := viewAccount.ReceiveCTAUTToken(
+						version, ctautScript.Type(), ctAUTToken.ValueScript,
+						tx.Version, txOutData)
+					if err != nil {
+						return fmt.Errorf("fail to get the amount of CT-AUT token: %v", err)
+					}
+					if !success {
+						continue
+					}
+
+					if ctautScript.Type() == abelian.CTAUTTypeBurn && tokenIndex == 0 {
+						continue
+					}
+
+					if isRootToken {
+						fmt.Printf("💲 Find CT-AUT Root token for CT-AUT with identifier %s of account with account id %d: block id %s, block height %d, transacion id %s, index %d, value %v to address fingerprint %s\n",
+							hex.EncodeToString(identifier[:]), viewAccount.ID, blockID, blockHeight, tx.TxHash, index, ctAutValue, hex.EncodeToString(coinAddress.Fingerprint()))
+					} else {
+						fmt.Printf("💲 Find CT-AUT token for CT-AUT with identifier %s of account with account id %d: block id %s, block height %d, transacion id %s, index %d, value %v to address fingerprint %s\n",
+							hex.EncodeToString(identifier[:]), viewAccount.ID, blockID, blockHeight, tx.TxHash, index, ctAutValue, hex.EncodeToString(coinAddress.Fingerprint()))
+					}
+
+					_, err = database.InsertToken(viewAccount.ID, hex.EncodeToString(identifier[:]),
+						tx.TxID, uint8(index),
+						isRootToken, uint8(tokenType),
+						ctAUTToken.ValueScript,
+						cryptoValuePK, cryptoValueSK,
+						int64(ctAutValue), version)
+					if err != nil {
+						return fmt.Errorf("fail to store coin into database: %v", err)
+					}
+				}
+			}
 		}
 	}
+	if ctautScript != nil && ctautScript.Type() == abelian.CTAUTTypeReRegistration {
+		identifier := ctautScript.Identifier()
+		for _, viewAccount := range viewAccounts {
+			// disable all other root tokens of the same CT-AUT
+			disabledTokens, err := database.DisableRootToken(viewAccount.ID, hex.EncodeToString(identifier[:]), tx.TxID)
+			if err != nil {
+				return fmt.Errorf("fail to disable root token: %v", err)
+			}
+			for i := 0; i < len(disabledTokens); i++ {
+				if disabledTokens[i].Status == 3 {
+					continue
+				}
+				err = database.InvalidSpentToken(disabledTokens[i].ID)
+				if err != nil {
+					return fmt.Errorf("fail to confirm spent token: %v", err)
+				}
+				fmt.Printf("🚫 Disable CT-AUT Root token for CT-AUT with identifier %s of account with account id %d: block id %s, block height %d, transacion id %s, index %d\n",
+					hex.EncodeToString(identifier[:]), viewAccount.ID, blockID, blockHeight, disabledTokens[i].TxID, disabledTokens[i].Index)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -56,6 +156,18 @@ func TrackCoins(tx *abelian.Tx) error {
 					fmt.Printf("💸 Coin of account with account id %d is consumed: block id %s, block height %d, transacion id %s, index %d, value %v ABELs\n",
 						coin.AccountID, coin.BlockHash, coin.BlockHeight, tx.TxHash, index, abelian.NeutrinoToAbel(coin.Value))
 
+					token, err := database.LoadTokenByPoint(coin.AccountID, coin.TxID, coin.Index)
+					if err != nil {
+						panic(fmt.Errorf("fail to load token by point from database: %v", err))
+					}
+					if token != nil {
+						err = database.ConfirmSpentToken(token.ID)
+						if err != nil {
+							panic(fmt.Errorf("fail to consume token: %v", err))
+						}
+						fmt.Printf("💸 CT-AUT token of account with account id %d is consumed: block id %s, block height %d, transacion id %s, index %d, value %v\n",
+							coin.AccountID, coin.BlockHash, coin.BlockHeight, tx.TxHash, index, token.Value)
+					}
 					break
 				}
 			}
@@ -194,6 +306,19 @@ func HandleCoinMaturity(height int64) error {
 			panic(fmt.Errorf("fail to mature immature coins"))
 		}
 		fmt.Printf("🎉 transfer coin (%s,%d) %v ABELs mature with ring info (%s,%d) \n", coin.TxID, coin.Index, abelian.NeutrinoToAbel(coin.Value), ringId, ringIndex)
+
+		token, err := database.LoadTokenByPoint(coin.AccountID, coin.TxID, coin.Index)
+		if err != nil {
+			panic(fmt.Errorf("fail to load token by point from database: %v", err))
+		}
+		if token != nil {
+			err = database.MatureToken(token.ID)
+			if err != nil {
+				panic(fmt.Errorf("fail to mature token: %v", err))
+			}
+			fmt.Printf("🎈CT-AUT token of account with account id %d is matured: block id %s, block height %d, transacion id %s, index %d, value %v\n",
+				coin.AccountID, coin.BlockHash, coin.BlockHeight, token.TxID, token.Index, token.Value)
+		}
 	}
 
 	return nil

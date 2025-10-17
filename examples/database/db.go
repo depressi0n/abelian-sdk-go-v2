@@ -3,9 +3,10 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"os"
+
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/common"
-	"os"
 )
 
 var db *sql.DB
@@ -101,6 +102,29 @@ func init() {
 		return
 	}
 	fmt.Println("Table tx created!")
+
+	stmt, err = db.Prepare(`CREATE TABLE IF NOT EXISTS ctaut (
+		ID INTEGER PRIMARY KEY,
+		account_id INTEGER,
+		identifier TEXT,
+		tx_id TEXT,
+		output_index INTEGER,
+		is_root_token BOOLEAN,
+		token_type INTEGER,
+		version INTEGER,
+		value_script BLOB,
+		value_pk BLOB,
+		value_sk BLOB,
+		value INTEGER,
+		status INTEGER)`)
+	if err != nil {
+		panic(err)
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		return
+	}
+	fmt.Println("Table ctaut created!")
 
 	if !dbExist {
 		initBuiltInAccount()

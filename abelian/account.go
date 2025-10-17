@@ -2,7 +2,10 @@ package abelian
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+
+	"github.com/abesuite/abec/ctaut"
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 
@@ -12,6 +15,7 @@ const (
 	AccountPrivacyLevelFullPrivacyOld AccountPrivacyLevel = 0
 	AccountPrivacyLevelFullPrivacy    AccountPrivacyLevel = 1
 	AccountPrivacyLevelPseudonym      AccountPrivacyLevel = 2
+	AccountPrivacyLevelPseudonymCT    AccountPrivacyLevel = 3
 )
 
 func NewAccount(networkID NetworkID, accountPrivacyLevel AccountPrivacyLevel) (Account, error) {
@@ -39,6 +43,8 @@ func NewAccount(networkID NetworkID, accountPrivacyLevel AccountPrivacyLevel) (A
 	case AccountPrivacyLevelFullPrivacy:
 		// nothing to do
 	case AccountPrivacyLevelPseudonym:
+		// nothing to do
+	case AccountPrivacyLevelPseudonymCT:
 		// nothing to do
 	default:
 		return nil, fmt.Errorf("invalid privacy level for account")
@@ -76,6 +82,10 @@ func getCryptoSchemeAndPrivacyLevel(accountPrivacyLevel AccountPrivacyLevel) (cr
 		cryptoScheme = crypto.CryptoSchemePQRingCTX
 		privacyLevel = crypto.PrivacyLevelPseudonym
 		break
+	case AccountPrivacyLevelPseudonymCT:
+		cryptoScheme = crypto.CryptoSchemePQRingCTX
+		privacyLevel = crypto.PrivacyLevelPseudonymCT
+		break
 	default:
 		panic("unsupported privacy level of account")
 	}
@@ -93,6 +103,10 @@ const (
 // - determine whether the coin belongs to the corresponding account
 // - generate serial number for specified coins
 type ViewAccount interface {
+	ReceiveCTAUTToken(version uint32, scriptType ctaut.CTAUTScriptType, valueScript []byte,
+		txVersion uint32, txOutData []byte) (success bool, v uint64, tokenType crypto.AutTokenType,
+		coinValuePK []byte, coinValueSK []byte, err error)
+
 	ReceiveCoin(txVersion uint32, txOutData []byte) (success bool, v uint64, err error)
 	GenerateSerialNumberWithBlocks(coinID *CoinID, serializedBlocksForRingGroup [][]byte) (coinSerialNumbers []byte, err error)
 	GenerateSerialNumbersWithBlocks(coinIDs []*CoinID, serializedBlocksForRingGroup [][]byte) (coinSerialNumbers [][]byte, err error)
@@ -227,6 +241,51 @@ func (account *RootSeedViewAccount) ReceiveCoin(txVersion uint32, txOutData []by
 	}
 	return success, v, nil
 }
+
+func (account *RootSeedViewAccount) ReceiveCTAUTToken(version uint32, scriptType ctaut.CTAUTScriptType,
+	valueScript []byte, txVersion uint32, txOutData []byte) (success bool,
+	v uint64, tokenType crypto.AutTokenType,
+	cryptoValuePK []byte, cryptoValueSK []byte, err error) {
+	if account.privacyLevel != crypto.PrivacyLevelPseudonymCT {
+		return false, 0, tokenType, nil, nil, nil
+	}
+
+	success, _, err = account.ReceiveCoin(txVersion, txOutData)
+	if err != nil {
+		return false, 0, tokenType, nil, nil, err
+	}
+	if !success {
+		return false, 0, tokenType, nil, nil, nil
+	}
+
+	privacyLevel, err := crypto.GetTxoPrivacyLevel(txVersion, txOutData)
+	if err != nil {
+		return false, 0, tokenType, nil, nil, err
+	}
+	if privacyLevel != crypto.PrivacyLevelPseudonymCT {
+		return false, 0, tokenType, nil, nil, nil
+	}
+
+	publicRandFromTxo, err := crypto.ExtractPublicRandFromTxo(txVersion, txOutData)
+	if err != nil {
+		return false, 0, tokenType, nil, nil, err
+	}
+
+	if scriptType == ctaut.Registration || scriptType == ctaut.ReRegistration {
+		return true, 0, tokenType, nil, nil, nil
+	}
+
+	cryptoValuePK, cryptoValueSK, err = crypto.CryptoValueKeyGen(account.coinValueKeySeed, publicRandFromTxo)
+	if err != nil {
+		return false, 0, tokenType, nil, nil, err
+	}
+	v, tokenType, err = crypto.ExtractCTAUTTokenValue(version, valueScript, cryptoValuePK, cryptoValueSK)
+	if err != nil {
+		return false, 0, tokenType, nil, nil, err
+	}
+	return true, v, tokenType, cryptoValuePK, cryptoValueSK, nil
+}
+
 func (account *RootSeedViewAccount) ViewKeyMaterial() ([]byte, []byte, []byte) {
 	var coinDetectorKey []byte
 	if account.coinDetectorKey != nil {
@@ -371,6 +430,28 @@ func (account *CryptoKeysViewAccount) ReceiveCoin(txVersion uint32, txOutData []
 	}
 	return success, v, nil
 }
+func (account *CryptoKeysViewAccount) ReceiveCTAUTToken(version uint32, scriptType ctaut.CTAUTScriptType,
+	valueScript []byte, txVersion uint32, txOutData []byte) (success bool,
+	v uint64, tokenType crypto.AutTokenType,
+	coinValuePK []byte, coinValueSK []byte, err error) {
+	return false, 0, tokenType, nil, nil, errors.New("unimplemented!")
+	privacyLevel, err := crypto.GetTxoPrivacyLevel(txVersion, txOutData)
+	if err != nil {
+		return false, 0, tokenType, nil, nil, err
+	}
+	if account.privacyLevel != privacyLevel {
+		return false, 0, tokenType, nil, nil, nil
+	}
+	if privacyLevel != crypto.PrivacyLevelPseudonymCT {
+		return false, 0, tokenType, nil, nil, nil
+	}
+
+	v, tokenType, err = crypto.ExtractCTAUTTokenValue(txVersion, txOutData /*TODO value public key*/, nil, account.viewSecretKey)
+	if err != nil {
+		return false, 0, tokenType, nil, nil, err
+	}
+	return true, v, tokenType, nil, nil, nil
+}
 func (account *CryptoKeysViewAccount) ViewKeyMaterial() ([]byte, []byte, []byte) {
 	var coinSerialNoSecretKey []byte
 	if account.serialNoSecretKey != nil {
@@ -463,6 +544,7 @@ func (account *CryptoKeysAccount) SpendKeyMaterial() []byte {
 func (account *CryptoKeysAccount) ViewAccount() ViewAccount {
 	return &account.CryptoKeysViewAccount
 }
+
 func (account *CryptoKeysAccount) GenerateAbelAddress() ([]byte, error) {
 	abelAddress := NewAbelAddressFromCryptoAddress(account.networkID, account.cryptoAddress)
 	return abelAddress.Data(), nil

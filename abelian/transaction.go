@@ -3,10 +3,11 @@ package abelian
 import (
 	"bytes"
 	"fmt"
-	api "github.com/pqabelian/abec/sdkapi/v2"
-	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 	"io"
 	"sort"
+
+	api "github.com/pqabelian/abec/sdkapi/v2"
+	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 
 type TxInDesc struct {
@@ -34,8 +35,20 @@ func SortTxInDescs(txIndescs []*TxInDesc) error {
 	sort.SliceStable(txIndescs, func(i, j int) bool {
 		coinAddressIPrivacyLevel, _ := crypto.GetTxoPrivacyLevel(txIndescs[i].TxVersion, txIndescs[i].TxOutData)
 		coinAddressJPrivacyLevel, _ := crypto.GetTxoPrivacyLevel(txIndescs[j].TxVersion, txIndescs[j].TxOutData)
-		if coinAddressIPrivacyLevel != crypto.PrivacyLevelPseudonym && coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym {
+
+		// Part I  [crypto.PrivacyLevelFullPrivacyPre, crypto.PrivacyLevelFullPrivacyRand]
+		// Part II [crypto.PrivacyLevelPseudonym, crypto.PrivacyLevelPseudonymCT]
+		if coinAddressIPrivacyLevel < crypto.PrivacyLevelPseudonym &&
+			coinAddressJPrivacyLevel >= crypto.PrivacyLevelPseudonym {
 			return true
+		}
+
+		// Part II [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txIndescs[i].CoinValue == 1 {
+			return true
+		}
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txIndescs[i].CoinValue == 1 {
+			return false
 		}
 		return false
 	})
@@ -49,10 +62,23 @@ type TxOutDesc struct {
 
 func SortTxOutDesc(txOutdescs []*TxOutDesc) error {
 	sort.SliceStable(txOutdescs, func(i, j int) bool {
-		if txOutdescs[i].AbelAddress.GetCryptoAddress().GetPrivacyLevel() != crypto.PrivacyLevelPseudonym &&
-			txOutdescs[j].AbelAddress.GetCryptoAddress().GetPrivacyLevel() == crypto.PrivacyLevelPseudonym {
+		coinAddressIPrivacyLevel := txOutdescs[i].AbelAddress.GetCryptoAddress().GetPrivacyLevel()
+		coinAddressJPrivacyLevel := txOutdescs[j].AbelAddress.GetCryptoAddress().GetPrivacyLevel()
+		// Part I  [crypto.PrivacyLevelFullPrivacyPre, crypto.PrivacyLevelFullPrivacyRand]
+		// Part II [crypto.PrivacyLevelPseudonym, crypto.PrivacyLevelPseudonymCT]
+		if coinAddressIPrivacyLevel < crypto.PrivacyLevelPseudonym &&
+			coinAddressJPrivacyLevel >= crypto.PrivacyLevelPseudonym {
 			return true
 		}
+
+		// Part II [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txOutdescs[i].CoinValue == 1 {
+			return true
+		}
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txOutdescs[i].CoinValue == 1 {
+			return false
+		}
+
 		return false
 	})
 	return nil
@@ -161,7 +187,20 @@ func SortTxInDescWithRing(txIndescs []*TxInDescWithRing) error {
 	sort.SliceStable(txIndescs, func(i, j int) bool {
 		coinAddressIPrivacyLevel, _ := crypto.GetTxoPrivacyLevel(txIndescs[i].TxVersion, txIndescs[i].TxOutData)
 		coinAddressJPrivacyLevel, _ := crypto.GetTxoPrivacyLevel(txIndescs[j].TxVersion, txIndescs[j].TxOutData)
-		if coinAddressIPrivacyLevel != crypto.PrivacyLevelPseudonym && coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym {
+
+		isPseudonymousI := coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonym || coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT
+		isPseudonymousJ := coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym || coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT
+		if isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if !isPseudonymousI && isPseudonymousJ {
+			return true
+		}
+		if !isPseudonymousI && !isPseudonymousJ {
+			return false
+		}
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			coinAddressJPrivacyLevel != crypto.PrivacyLevelPseudonymCT {
 			return true
 		}
 		return false
@@ -191,9 +230,18 @@ func NewTxDescWithRing(txInDescs []*TxInDescWithRing, txOutDescs []*TxOutDesc, t
 		TxFee:      txFee,
 	}
 }
+func NewTxDescWithRingWithMemo(txInDescs []*TxInDescWithRing, txOutDescs []*TxOutDesc, txFee int64, txMemo []byte) *TxDescWithRing {
+	return &TxDescWithRing{
+		TxInDescs:  txInDescs,
+		TxOutDescs: txOutDescs,
+		TxFee:      txFee,
+		TxMemo:     txMemo,
+	}
+}
 
 type UnsignedRawTx struct {
-	Data []byte
+	Data       []byte
+	AutWitness []byte
 }
 
 type TxBlockDesc struct {
@@ -349,6 +397,74 @@ func GenerateSignedRawTx(unsignedRawTx *UnsignedRawTx, signerAccounts []Account)
 			))
 		}
 		serializedTxFull, txid, err = api.CreateTransferTxByRootSeed(unsignedRawTx.Data, seeds)
+		if err != nil {
+			sdkLog.Errorf("fail to create transfer tx by root seed: %v", err)
+			return nil, err
+		}
+	case AccountTypeKeys:
+		// Prepare cryptoKeys.
+		cryptoKeys := make([]*api.CryptoKey, 0, len(signerAccounts))
+		for i := 0; i < len(signerAccounts); i++ {
+			coinSerialNumberKeyMaterial, coinValueKeyMaterial, coinDetectorKeyMaterial := signerAccounts[i].ViewKeyMaterial()
+			coinSpendSecretKeyMaterial := signerAccounts[i].SpendKeyMaterial()
+			signerViewAccount := signerAccounts[i].(*CryptoKeysAccount)
+			cryptoKeys = append(cryptoKeys, api.NewCryptoKey(
+				signerViewAccount.cryptoAddress.Data(),
+				coinSpendSecretKeyMaterial,
+				coinSerialNumberKeyMaterial,
+				coinValueKeyMaterial,
+				coinDetectorKeyMaterial,
+			))
+		}
+
+		// Call API to create the signed raw tx.
+		serializedTxFull, txid, err = api.CreateTransferTxByCryptoKeys(unsignedRawTx.Data, cryptoKeys)
+		if err != nil {
+			sdkLog.Errorf("fail to create transfer tx by crypto keys: %v", err)
+			return nil, err
+		}
+	default:
+		return nil, ErrInvalidAccountType
+	}
+
+	return &SignedRawTx{
+		Data: serializedTxFull,
+		TxID: txid.String(),
+	}, nil
+}
+
+func GenerateSignedRawTxForCTAUT(unsignedRawTx *UnsignedRawTx, signerAccounts []Account) (*SignedRawTx, error) {
+	if len(signerAccounts) == 0 {
+		return nil, fmt.Errorf("no singer specified")
+	}
+	firstAccountType := signerAccounts[0].AccountType()
+	for i := 1; i < len(signerAccounts); i++ {
+		if signerAccounts[i].AccountType() != firstAccountType {
+			sdkLog.Errorf("all specified account must be the same type")
+			return nil, fmt.Errorf("all specified account must be the same type")
+		}
+	}
+
+	var serializedTxFull []byte
+	var txid *api.TxId
+	var err error
+	switch firstAccountType {
+	case AccountTypeSeeds:
+		seeds := make([]*api.CryptoRootSeed, 0, len(signerAccounts))
+		for i := 0; i < len(signerAccounts); i++ {
+			coinSerialNumberKeyMaterial, coinValueKeyMaterial, coinDetectorKeyMaterial := signerAccounts[i].ViewKeyMaterial()
+			coinSpendSecretKeyMaterial := signerAccounts[i].SpendKeyMaterial()
+			signerViewAccount := signerAccounts[i].(*RootSeedAccount)
+			seeds = append(seeds, api.NewRootSeed(
+				signerViewAccount.cryptoScheme,
+				signerViewAccount.privacyLevel,
+				coinSpendSecretKeyMaterial,
+				coinSerialNumberKeyMaterial,
+				coinValueKeyMaterial,
+				coinDetectorKeyMaterial,
+			))
+		}
+		serializedTxFull, txid, err = api.CreateTransferTxByRootSeedForCTAUT(unsignedRawTx.Data, unsignedRawTx.AutWitness, seeds)
 		if err != nil {
 			sdkLog.Errorf("fail to create transfer tx by root seed: %v", err)
 			return nil, err

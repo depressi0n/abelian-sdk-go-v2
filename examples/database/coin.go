@@ -241,6 +241,56 @@ func LoadCoinByAccountID(id int64) ([]*Coin, error) {
 	}
 	return coins, err
 }
+func LoadCoinByPoint(id int64, txid string, index uint8) (*Coin, error) {
+	rows, err := db.Query(`SELECT ID,account_id,transaction_version,transaction_id,output_index,coin_value,block_id ,block_height, data,ring_id,ring_index
+								 FROM coin  
+								WHERE account_id = ? AND transaction_id = ? AND output_index = ? AND status = 1`, id, txid, index)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ID int64
+	var accountID int64
+	var txVersion uint32
+	var txID string
+	var outputIndex uint8
+	var value int64
+	var blockID string
+	var blockHeight int64
+	var data []byte
+	var ringID string
+	var ringIndex uint8
+
+	for rows.Next() {
+		err = rows.Scan(
+			&ID,
+			&accountID,
+			&txVersion,
+			&txID,
+			&outputIndex,
+			&value,
+			&blockID,
+			&blockHeight,
+			&data,
+			&ringID,
+			&ringIndex,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	abelianCoin := abelian.NewCoin(txVersion, txID, outputIndex,
+		blockID, blockHeight, value, "", data)
+	abelianCoin.SetRingInfo(ringID, ringIndex)
+
+	coin := &Coin{
+		ID:        id,
+		AccountID: accountID,
+		Coin:      abelianCoin,
+	}
+	return coin, err
+}
 func LoadCoinBySerialNumber(serialNumber string) ([]*Coin, error) {
 	rows, err := db.Query(`
 SELECT ID,account_id,transaction_id,output_index,coin_value,block_id ,block_height 

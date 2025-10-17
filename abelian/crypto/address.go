@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/sha256"
 	"fmt"
+
 	api "github.com/pqabelian/abec/sdkapi/v2"
 	"golang.org/x/crypto/sha3"
 )
@@ -46,6 +47,7 @@ const (
 	COIN_ADDRESS_TYPE_FULL_PRIVACY_PRE  CoinAddressType = 0
 	COIN_ADDRESS_TYPE_FULL_PRIVACY_RAND CoinAddressType = 1
 	COIN_ADDRESS_TYPE_PSEUDONYM         CoinAddressType = 2
+	COIN_ADDRESS_TYPE_PSEUDONYMCT       CoinAddressType = 3
 )
 
 // CoinAddress abstract application layer’s functional requirements for
@@ -74,9 +76,18 @@ func NewCoinAddress(data []byte) (CoinAddress, error) {
 			data: data,
 		}
 	case COIN_ADDRESS_LENGTH_PSEUDONYM:
-		coinAddress = &CoinAddressPseudonym{
-			data: data,
+		if data[0] == uint8(COIN_ADDRESS_TYPE_PSEUDONYM) {
+			coinAddress = &CoinAddressPseudonym{
+				data: data,
+			}
+		} else if data[0] == uint8(COIN_ADDRESS_TYPE_PSEUDONYMCT) {
+			coinAddress = &CoinAddressPseudonym{
+				data: data,
+			}
+		} else {
+			return nil, ErrInvalidAddress
 		}
+
 	default:
 		log.Errorf("invalid coin address %v with length %d", data, len(data))
 		return nil, ErrInvalidAddress
@@ -186,6 +197,45 @@ func (address *CoinAddressPseudonym) Validate() error {
 		log.Errorf("invalid coin address %v with length %d for privacy level %d", address.data, len(address.data), COIN_ADDRESS_LENGTH_PSEUDONYM)
 		return fmt.Errorf("coin address data length is not %d", COIN_ADDRESS_LENGTH_PSEUDONYM)
 	}
+	if address.data[0] != uint8(COIN_ADDRESS_LENGTH_PSEUDONYM) {
+		return fmt.Errorf("coin address data type is not %d", COIN_ADDRESS_TYPE_PSEUDONYM)
+	}
+
+	return nil
+}
+
+type CoinAddressPseudonymCT struct {
+	data []byte
+}
+
+func (address *CoinAddressPseudonymCT) AddressType() AddressType {
+	return ADDRESS_TYPE_COIN_ADDRESS
+}
+
+func (address *CoinAddressPseudonymCT) CoinAddressType() CoinAddressType {
+	return COIN_ADDRESS_TYPE_PSEUDONYMCT
+}
+
+func (address *CoinAddressPseudonymCT) Data() []byte {
+	return address.data
+}
+
+func (address *CoinAddressPseudonymCT) PrivacyLevel() PrivacyLevel {
+	return PrivacyLevelPseudonymCT
+}
+
+func (address *CoinAddressPseudonymCT) Fingerprint() []byte {
+	hash := sha3.Sum256(address.data)
+	return hash[:]
+}
+
+func (address *CoinAddressPseudonymCT) Validate() error {
+	if len(address.data) != COIN_ADDRESS_LENGTH_PSEUDONYM {
+		return fmt.Errorf("coin address data length is not %d", COIN_ADDRESS_LENGTH_PSEUDONYM)
+	}
+	if address.data[0] != uint8(COIN_ADDRESS_TYPE_PSEUDONYMCT) {
+		return fmt.Errorf("coin address data type is not %d", COIN_ADDRESS_TYPE_PSEUDONYMCT)
+	}
 
 	return nil
 }
@@ -195,6 +245,7 @@ const (
 	CRYPTO_ADDRESS_LENGTH_FULL_PRIVACT_PRE  = 10696
 	CRYPTO_ADDRESS_LENGTH_FULL_PRIVACY_RAND = 10826
 	CRYPTO_ADDRESS_LENGTH_PSEUDONYM         = 198
+	CRYPTO_ADDRESS_LENGTH_PSEUDONYMCT       = 1391
 )
 
 // CryptoAddress encapsulated coin address for upper layer
@@ -232,6 +283,11 @@ func (a *CryptoAddress) Validate() error {
 			if len(a.data) != CRYPTO_ADDRESS_LENGTH_PSEUDONYM {
 				log.Errorf("invalid crypto address %v with length %d for privacy level %d", a.data, len(a.data), CRYPTO_ADDRESS_LENGTH_PSEUDONYM)
 				return fmt.Errorf("crypto address data length should be %d, but got %d", CRYPTO_ADDRESS_LENGTH_PSEUDONYM, len(a.data))
+			}
+		} else if a.privacyLevel == PrivacyLevelPseudonymCT {
+			if len(a.data) != CRYPTO_ADDRESS_LENGTH_PSEUDONYMCT {
+				log.Errorf("invalid crypto address %v with length %d for privacy level %d", a.data, len(a.data), CRYPTO_ADDRESS_LENGTH_PSEUDONYMCT)
+				return fmt.Errorf("crypto address data length should be %d, but got %d", CRYPTO_ADDRESS_LENGTH_PSEUDONYMCT, len(a.data))
 			}
 		} else {
 			return fmt.Errorf("mismatched crypto scheme %d and privacy level %d", a.cryptoScheme, a.privacyLevel)
