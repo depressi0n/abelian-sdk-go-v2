@@ -102,7 +102,9 @@ func (s *CryptoSeeds) Validate() error {
 			return ErrCorruptedSeed
 		}
 	case CryptoSchemePQRingCTX:
-		if s.privacyLevel != PrivacyLevelFullPrivacyRand && s.privacyLevel != PrivacyLevelPseudonym {
+		if s.privacyLevel != PrivacyLevelFullPrivacyRand &&
+			s.privacyLevel != PrivacyLevelPseudonym &&
+			s.privacyLevel != PrivacyLevelPseudonymCT {
 			log.Errorf("mismatched privacy level %d with crypto scheme %d", s.privacyLevel, s.cryptoScheme)
 			return ErrMismatchedCryptoSchemePrivacyLevel
 		}
@@ -113,10 +115,17 @@ func (s *CryptoSeeds) Validate() error {
 		if s.coinSpendKeySeed == nil && len(s.coinSpendKeySeed) == 0 {
 			return ErrCorruptedSeed
 		}
-		if s.privacyLevel != PrivacyLevelPseudonym {
+		if s.privacyLevel == PrivacyLevelFullPrivacyRand {
 			if s.coinSerialNumberKeySeed == nil && len(s.coinSerialNumberKeySeed) == 0 {
 				return ErrCorruptedSeed
 			}
+			if s.coinValueKeySeed == nil && len(s.coinValueKeySeed) == 0 {
+				return ErrCorruptedSeed
+			}
+		} else if s.privacyLevel == PrivacyLevelFullPrivacyRand {
+			//if s.coinSerialNumberKeySeed == nil && len(s.coinSerialNumberKeySeed) == 0 {
+			//	return ErrCorruptedSeed
+			//}
 			if s.coinValueKeySeed == nil && len(s.coinValueKeySeed) == 0 {
 				return ErrCorruptedSeed
 			}
@@ -162,7 +171,9 @@ func (s *CryptoSeeds) Serialize() ([]byte, error) {
 		addressKeyCryptoSeed = append(addressKeyCryptoSeed, s.coinValueKeySeed...)
 		return addressKeyCryptoSeed, nil
 	case CryptoSchemePQRingCTX:
-		if s.privacyLevel != PrivacyLevelFullPrivacyRand && s.privacyLevel != PrivacyLevelPseudonym {
+		if s.privacyLevel != PrivacyLevelFullPrivacyRand &&
+			s.privacyLevel != PrivacyLevelPseudonym &&
+			s.privacyLevel != PrivacyLevelPseudonymCT {
 			return nil, ErrMismatchedCryptoSchemePrivacyLevel
 		}
 		expectedSeedLen := 2 * underlyingSeedLen
@@ -186,6 +197,10 @@ func (s *CryptoSeeds) Serialize() ([]byte, error) {
 			addressKeySeed = append(addressKeySeed, s.coinSerialNumberKeySeed...)
 			addressKeySeed = append(addressKeySeed, s.coinValueKeySeed...)
 		}
+		if s.privacyLevel == PrivacyLevelPseudonymCT {
+			//addressKeySeed = append(addressKeySeed, s.coinSerialNumberKeySeed...)
+			addressKeySeed = append(addressKeySeed, s.coinValueKeySeed...)
+		}
 		addressKeySeed = append(addressKeySeed, s.coinDetectorKey...)
 
 		if s.seedsType == seedsTypeRand {
@@ -204,7 +219,9 @@ func NewRootSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 	if cryptoScheme != CryptoSchemePQRingCTX {
 		return nil, ErrInvalidCryptoScheme
 	}
-	if privacyLevel != PrivacyLevelFullPrivacyRand && privacyLevel != PrivacyLevelPseudonym {
+	if privacyLevel != PrivacyLevelFullPrivacyRand &&
+		privacyLevel != PrivacyLevelPseudonym &&
+		privacyLevel != PrivacyLevelPseudonymCT {
 		return nil, ErrInvalidPrivacyLevel
 	}
 
@@ -218,7 +235,10 @@ func NewRootSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 		coinDetectorKey:         coinDetectorKey,
 		publicRand:              nil,
 	}
-
+	if privacyLevel == PrivacyLevelPseudonymCT {
+		seed.coinSerialNumberKeySeed = nil
+		//seed.coinValueKeySeed = nil
+	}
 	if privacyLevel == PrivacyLevelPseudonym {
 		seed.coinSerialNumberKeySeed = nil
 		seed.coinValueKeySeed = nil
@@ -245,7 +265,9 @@ func NewRandSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 		}
 		seed.coinValueKeySeed = coinValueKeySeed
 	case CryptoSchemePQRingCTX:
-		if privacyLevel != PrivacyLevelFullPrivacyRand && privacyLevel != PrivacyLevelPseudonym {
+		if privacyLevel != PrivacyLevelFullPrivacyRand &&
+			privacyLevel != PrivacyLevelPseudonym &&
+			privacyLevel != PrivacyLevelPseudonymCT {
 			return nil, ErrInvalidPrivacyLevel
 		}
 
@@ -254,6 +276,9 @@ func NewRandSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 		seed.coinDetectorKey = coinDetectorKey
 		seed.publicRand = publicRand
 
+		if privacyLevel == PrivacyLevelPseudonymCT {
+			seed.coinSerialNumberKeySeed = nil
+		}
 		if privacyLevel == PrivacyLevelPseudonym {
 			seed.coinSerialNumberKeySeed = nil
 			seed.coinValueKeySeed = nil
@@ -305,13 +330,22 @@ func deserializeSeed(seed []byte) (*CryptoSeeds, error) {
 		privacyLevel = PrivacyLevel(seed[offset])
 		offset += 1
 
-		if privacyLevel != PrivacyLevelFullPrivacyRand && privacyLevel != PrivacyLevelPseudonym {
+		if privacyLevel != PrivacyLevelFullPrivacyRand &&
+			privacyLevel != PrivacyLevelPseudonym &&
+			privacyLevel != PrivacyLevelPseudonymCT {
 			return nil, fmt.Errorf("corrupted crypto seed")
 		}
 
 		publicRandLen, _ := GetParamKeyGenPublicRandBytesLen(cryptoScheme)
 		if privacyLevel == PrivacyLevelFullPrivacyRand {
-			if len(seed) != cryptoSchemeSize+1+4*underlyingSeedLen && len(seed) != cryptoSchemeSize+1+4*underlyingSeedLen+publicRandLen {
+			if len(seed) != cryptoSchemeSize+1+4*underlyingSeedLen &&
+				len(seed) != cryptoSchemeSize+1+4*underlyingSeedLen+publicRandLen {
+				return nil, fmt.Errorf("invalid length of seed")
+			}
+		}
+		if privacyLevel == PrivacyLevelPseudonymCT {
+			if len(seed) != cryptoSchemeSize+1+3*underlyingSeedLen &&
+				len(seed) != cryptoSchemeSize+1+3*underlyingSeedLen+publicRandLen {
 				return nil, fmt.Errorf("invalid length of seed")
 			}
 		}
@@ -326,6 +360,12 @@ func deserializeSeed(seed []byte) (*CryptoSeeds, error) {
 		if privacyLevel == PrivacyLevelFullPrivacyRand {
 			coinSerialNumberKeyRootSeed = seed[offset : offset+underlyingSeedLen]
 			offset += underlyingSeedLen
+			coinValueKeyRootSeed = seed[offset : offset+underlyingSeedLen]
+			offset += underlyingSeedLen
+		}
+		if privacyLevel == PrivacyLevelPseudonymCT {
+			//coinSerialNumberKeyRootSeed = seed[offset : offset+underlyingSeedLen]
+			//offset += underlyingSeedLen
 			coinValueKeyRootSeed = seed[offset : offset+underlyingSeedLen]
 			offset += underlyingSeedLen
 		}

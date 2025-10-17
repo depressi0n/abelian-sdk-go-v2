@@ -10,7 +10,7 @@ require (
 	github.com/pqabelian/abec v1.0.1-0.20250407103915-4c0a8a71793f
 	github.com/pqabelian/abelian-aip11-go v0.0.0-20241209075354-09202e9533a5
 	github.com/pqabelian/abeutil v0.0.0-20231107022913-d6d3bf295938
-	golang.org/x/crypto v0.31.0
+	golang.org/x/crypto v0.36.0
 	google.golang.org/protobuf v1.36.5
 )
 
@@ -24,5 +24,5 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/pqabelian/pqringct v0.0.0-20240724124001-42a8952f4b48 // indirect
 	github.com/pqabelian/pqringctx v0.0.0-20240724125306-0783f8ceef6b // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
 )

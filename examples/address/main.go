@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 
@@ -31,6 +32,10 @@ func main() {
 		{
 			crypto.CryptoSchemePQRingCTX,
 			crypto.PrivacyLevelPseudonym,
+		},
+		{
+			crypto.CryptoSchemePQRingCTX,
+			crypto.PrivacyLevelPseudonymCT,
 		},
 	} {
 		fmt.Println("==============")
