@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 
 	api "github.com/pqabelian/abec/sdkapi/v2"
@@ -43,13 +44,27 @@ func SortTxInDescs(txIndescs []*TxInDesc) error {
 			return true
 		}
 
-		// Part II [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
-		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txIndescs[i].CoinValue == 1 {
+		// Part I keep the origin order
+
+		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			txIndescs[i].CoinValue == 1 {
 			return true
 		}
-		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txIndescs[i].CoinValue == 1 {
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			txIndescs[j].CoinValue == 1 {
 			return false
 		}
+		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym {
+			return true
+		}
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonym {
+			return false
+		}
+
 		return false
 	})
 	return nil
@@ -64,6 +79,7 @@ func SortTxOutDesc(txOutdescs []*TxOutDesc) error {
 	sort.SliceStable(txOutdescs, func(i, j int) bool {
 		coinAddressIPrivacyLevel := txOutdescs[i].AbelAddress.GetCryptoAddress().GetPrivacyLevel()
 		coinAddressJPrivacyLevel := txOutdescs[j].AbelAddress.GetCryptoAddress().GetPrivacyLevel()
+
 		// Part I  [crypto.PrivacyLevelFullPrivacyPre, crypto.PrivacyLevelFullPrivacyRand]
 		// Part II [crypto.PrivacyLevelPseudonym, crypto.PrivacyLevelPseudonymCT]
 		if coinAddressIPrivacyLevel < crypto.PrivacyLevelPseudonym &&
@@ -71,11 +87,24 @@ func SortTxOutDesc(txOutdescs []*TxOutDesc) error {
 			return true
 		}
 
-		// Part II [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
-		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txOutdescs[i].CoinValue == 1 {
+		// Part I keep the origin order
+
+		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			txOutdescs[i].CoinValue == 1 {
 			return true
 		}
-		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT && txOutdescs[i].CoinValue == 1 {
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			txOutdescs[j].CoinValue == 1 {
+			return false
+		}
+		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym {
+			return true
+		}
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonym {
 			return false
 		}
 
@@ -396,7 +425,13 @@ func GenerateSignedRawTx(unsignedRawTx *UnsignedRawTx, signerAccounts []Account)
 				coinDetectorKeyMaterial,
 			))
 		}
-		serializedTxFull, txid, err = api.CreateTransferTxByRootSeed(unsignedRawTx.Data, seeds)
+		txVersion := api.TxVersion
+		switchToMLP, _ := os.LookupEnv("ABELIAN_SDK_SWITCH_TX_MLPAUT_VERSION")
+		if switchToMLP != "" {
+			txVersion = api.TxVersionV2
+		}
+
+		serializedTxFull, txid, err = api.CreateTransferTxByRootSeed(txVersion, unsignedRawTx.Data, seeds)
 		if err != nil {
 			sdkLog.Errorf("fail to create transfer tx by root seed: %v", err)
 			return nil, err
@@ -417,8 +452,14 @@ func GenerateSignedRawTx(unsignedRawTx *UnsignedRawTx, signerAccounts []Account)
 			))
 		}
 
+		txVersion := api.TxVersion
+		switchToMLP, _ := os.LookupEnv("ABELIAN_SDK_SWITCH_TX_MLPAUT_VERSION")
+		if switchToMLP != "" {
+			txVersion = api.TxVersionV2
+		}
+
 		// Call API to create the signed raw tx.
-		serializedTxFull, txid, err = api.CreateTransferTxByCryptoKeys(unsignedRawTx.Data, cryptoKeys)
+		serializedTxFull, txid, err = api.CreateTransferTxByCryptoKeys(txVersion, unsignedRawTx.Data, cryptoKeys)
 		if err != nil {
 			sdkLog.Errorf("fail to create transfer tx by crypto keys: %v", err)
 			return nil, err
@@ -485,8 +526,13 @@ func GenerateSignedRawTxForCTAUT(unsignedRawTx *UnsignedRawTx, signerAccounts []
 			))
 		}
 
+		txVersion := api.TxVersion
+		//switchToMLP, _ := os.LookupEnv("ABELIAN_SDK_SWITCH_TX_MLPAUT_VERSION")
+		//if switchToMLP != "" {
+		//	txVersion = api.TxVersionV2
+		//}
 		// Call API to create the signed raw tx.
-		serializedTxFull, txid, err = api.CreateTransferTxByCryptoKeys(unsignedRawTx.Data, cryptoKeys)
+		serializedTxFull, txid, err = api.CreateTransferTxByCryptoKeys(txVersion, unsignedRawTx.Data, cryptoKeys)
 		if err != nil {
 			sdkLog.Errorf("fail to create transfer tx by crypto keys: %v", err)
 			return nil, err
