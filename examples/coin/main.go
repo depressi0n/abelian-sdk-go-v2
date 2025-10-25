@@ -25,7 +25,7 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 	if err != nil {
 		return err
 	}
-	ctautScript, err := abelian.ParseCTAUTScript(tx.TxID, txMemo)
+	ctautScript, err := abelian.ParseCTAUTScript(tx.Version, tx.TxID, txMemo)
 	if err != nil {
 		return err
 	}

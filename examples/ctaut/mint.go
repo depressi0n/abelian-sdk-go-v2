@@ -72,6 +72,7 @@ func mintCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, mintThreshold uin
 	// For simplicity, we make it already for output
 
 	txMemo, autWitness, err := abelian.CreateCTAUTMintScript(
+		abelian.TxVersionCTAUT,
 		identifier,
 		vin,
 		uint8(len(filterRootTokens)),

@@ -108,6 +108,7 @@ func transferCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 	}
 
 	txMemo, autWitness, err := abelian.CreateCTAUTTransferScript(
+		abelian.TxVersionCTAUT,
 		identifier,
 		consumedTokens,
 		recipients,

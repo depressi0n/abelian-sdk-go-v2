@@ -70,6 +70,7 @@ func reRegisterCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, reRegisterT
 		issuerTokens = append(issuerTokens, address.GetCryptoAddress().GetCoinAddress().Data())
 	}
 	txMemo, autWitness, err := abelian.CreateCTAUTReRegisterScript(
+		abelian.TxVersionCTAUT,
 		identifier,
 		[]byte("Post-Quantum USD on the world"),
 		uint64(1)<<51-1,

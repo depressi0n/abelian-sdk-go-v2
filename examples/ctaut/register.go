@@ -48,6 +48,7 @@ func registerCTAUT() {
 	}
 
 	txMemo, autWitness, err := abelian.CreateCTAUTRegisterScript(
+		abelian.TxVersionCTAUT,
 		[]byte("Post-Quantum USD"),
 		[]byte("PQUSD"),
 		[]byte("USD"),

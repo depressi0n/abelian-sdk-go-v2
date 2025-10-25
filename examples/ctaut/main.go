@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian"
@@ -30,7 +29,7 @@ func SignRawTransactionForCTAUT(unsignedRawTx *abelian.UnsignedRawTx, senderAcco
 }
 func main() {
 	// 1. register
-	//registerCTAUT()
+	registerCTAUT()
 
 	// 2. reregister
 	//identifier, err := abelian.CTAUTIdentifierKey("e93b0f0d04415e76fd27f95b49b6b9e394883f8154777f5aa63e84f2ceef51bf")
@@ -57,10 +56,10 @@ func main() {
 	//transferCTAUT(identifier)
 
 	// 5. burn
-	identifier, err := abelian.CTAUTIdentifierKey("e93b0f0d04415e76fd27f95b49b6b9e394883f8154777f5aa63e84f2ceef51bf")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("identifier: ", hex.EncodeToString(identifier[:]))
-	burnCTAUT(identifier)
+	//identifier, err := abelian.CTAUTIdentifierKey("e93b0f0d04415e76fd27f95b49b6b9e394883f8154777f5aa63e84f2ceef51bf")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println("identifier: ", hex.EncodeToString(identifier[:]))
+	//burnCTAUT(identifier)
 }

@@ -6,14 +6,16 @@ import (
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 
+const TxVersionCTAUT = v2.TxVersionCTAUT
+
 type CTAUTToken struct {
 	Version      uint32
 	HostOutpoint OutPoint
 	ValueScript  []byte
 }
 
-func ParseCTAUTScript(txID string, memo []byte) (v2.CTAUTScript, error) {
-	return v2.ParseCTAUTScript(txID, memo)
+func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (v2.CTAUTScript, error) {
+	return v2.ParseCTAUTScript(txVersion, txID, memo)
 }
 
 func GetGeneratedCTAUTTokens(ctAutScript v2.CTAUTScript, txVersion uint32, txHash string, serializedTxOuts [][]byte) ([]*CTAUTToken, error) {
@@ -76,7 +78,7 @@ const (
 
 type CTAUTRegisterScript = v2.CTAUTRegisterScript
 
-func CreateCTAUTRegisterScript(name []byte, symbol []byte,
+func CreateCTAUTRegisterScript(version uint32, name []byte, symbol []byte,
 	baseUnitName []byte, subUnitName []byte, unitScale uint64,
 	autMemo []byte, plannedTotalAmount uint64,
 	issuerCryptoAddresses [][]byte, mintThreshold uint8, reRegisterThreshold uint8,
@@ -89,6 +91,7 @@ func CreateCTAUTRegisterScript(name []byte, symbol []byte,
 	}
 
 	return v2.NewRegistrationScript(
+		version,
 		name, symbol,
 		baseUnitName, subUnitName, unitScale,
 		autMemo, plannedTotalAmount, issuerTokens, mintThreshold, reRegisterThreshold,
@@ -96,7 +99,8 @@ func CreateCTAUTRegisterScript(name []byte, symbol []byte,
 	)
 }
 
-func CreateCTAUTReRegisterScript(identifier [CTAUTIdentifierLength]byte,
+func CreateCTAUTReRegisterScript(version uint32,
+	identifier [CTAUTIdentifierLength]byte,
 	autMemo []byte, plannedTotalAmount uint64,
 	issuerCryptoAddresses [][]byte, mintThreshold uint8, reregisterThreshold uint8,
 	expiryBlock int32, inAutRootTokenNum uint8, outAutRootTokenNum uint8, memo []byte,
@@ -108,6 +112,7 @@ func CreateCTAUTReRegisterScript(identifier [CTAUTIdentifierLength]byte,
 	}
 
 	return v2.NewReRegistrationScript(
+		version,
 		identifier,
 		autMemo, plannedTotalAmount, issuerTokens, mintThreshold, reregisterThreshold, expiryBlock,
 		inAutRootTokenNum, outAutRootTokenNum,
@@ -121,7 +126,8 @@ type Recipient struct {
 	HideValue     bool
 }
 
-func CreateCTAUTMintScript(identifier [CTAUTIdentifierLength]byte,
+func CreateCTAUTMintScript(version uint32,
+	identifier [CTAUTIdentifierLength]byte,
 	vin uint64, inAutRootTokenNum uint8, recipients []*Recipient,
 	memo []byte,
 ) ([]byte, []byte, error) {
@@ -135,7 +141,7 @@ func CreateCTAUTMintScript(identifier [CTAUTIdentifierLength]byte,
 		}
 	}
 
-	return v2.NewMintScript(identifier, vin, inAutRootTokenNum, autTxOutputDescs, memo)
+	return v2.NewMintScript(version, identifier, vin, inAutRootTokenNum, autTxOutputDescs, memo)
 
 }
 
@@ -157,7 +163,8 @@ func NewInputTokenDesc(version uint32, valueScript []byte, cryptoValuePublicKey 
 	}
 }
 
-func CreateCTAUTTransferScript(identifier [CTAUTIdentifierLength]byte,
+func CreateCTAUTTransferScript(version uint32,
+	identifier [CTAUTIdentifierLength]byte,
 	consumedToken []*InputTokenDesc, recipients []*Recipient,
 	memo []byte,
 ) ([]byte, []byte, error) {
@@ -185,10 +192,11 @@ func CreateCTAUTTransferScript(identifier [CTAUTIdentifierLength]byte,
 		}
 	}
 
-	return v2.NewTransferScript(identifier, autTxInputDescs, autTxOutputDescs, memo)
+	return v2.NewTransferScript(version, identifier, autTxInputDescs, autTxOutputDescs, memo)
 }
 
-func CreateCTAUTBurnScript(identifier [CTAUTIdentifierLength]byte,
+func CreateCTAUTBurnScript(version uint32,
+	identifier [CTAUTIdentifierLength]byte,
 	consumedToken []*InputTokenDesc, recipients []*Recipient,
 	memo []byte,
 ) ([]byte, []byte, error) {
@@ -216,7 +224,7 @@ func CreateCTAUTBurnScript(identifier [CTAUTIdentifierLength]byte,
 		}
 	}
 
-	return v2.NewBurnScript(identifier, autTxInputDescs, autTxOutputDescs, memo)
+	return v2.NewBurnScript(version, identifier, autTxInputDescs, autTxOutputDescs, memo)
 
 }
 

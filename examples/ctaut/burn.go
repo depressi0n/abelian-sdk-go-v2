@@ -104,6 +104,7 @@ func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 	}
 
 	txMemo, autWitness, err := abelian.CreateCTAUTBurnScript(
+		abelian.TxVersionCTAUT,
 		identifier,
 		consumedTokens,
 		recipients,
