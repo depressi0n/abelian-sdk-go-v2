@@ -14,8 +14,19 @@ type CTAUTToken struct {
 	ValueScript  []byte
 }
 
-func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (v2.CTAUTScript, error) {
+type CTAUTScript = v2.CTAUTScript
+
+func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, error) {
 	return v2.ParseCTAUTScript(txVersion, txID, memo)
+}
+
+type CTAUTInstance = v2.Metadata
+
+func RegisteredInstanceFromCTAUTScript(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*CTAUTInstance, error) {
+	return v2.RegisteredCTAUTInstance(script, txVersion, txID, serializedTxOuts)
+}
+func ReRegisteredInstanceFromCTAUTScript(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *CTAUTInstance) error {
+	return v2.ReRegisteredCTAUTInstance(script, txVersion, txID, serializedTxOuts, metadata)
 }
 
 func GetGeneratedCTAUTTokens(ctAutScript v2.CTAUTScript, txVersion uint32, txHash string, serializedTxOuts [][]byte) ([]*CTAUTToken, error) {
