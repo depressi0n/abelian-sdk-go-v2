@@ -1,5 +1,162 @@
 package database
 
+type Metadata struct {
+	ID             int64
+	RegisteredTxID string
+	Version        uint32
+	Identifier     string
+	Name           string
+	Symbol         string
+	BaseUnitName   string
+	SubUnitName    string
+	UnitScale      uint64
+	Memo           string
+
+	PlannedTotalAmount      uint64
+	IssuerTokens            string
+	MintThreshold           uint8
+	ReregistrationThreshold uint8
+	ExpireHeight            int32
+
+	MintedAmount uint64
+	BurnedAmount uint64
+}
+
+func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
+	// check exist firstly
+	exist, err := db.Query(`SELECT id FROM metadata WHERE identifier = ?`, metadata.Identifier)
+	if err != nil {
+		return -1, err
+	}
+	defer exist.Close()
+	if exist.Next() {
+		var id int64
+		err := exist.Scan(&id)
+		if err != nil {
+			return -1, err
+		}
+		return id, err
+	}
+
+	stmt, err := db.Prepare(`INSERT INTO metadata (registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount) 
+									VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	if err != nil {
+		return -1, err
+	}
+	result, err := stmt.Exec(
+		metadata.RegisteredTxID,
+		metadata.Version,
+		metadata.Identifier,
+		metadata.Name,
+		metadata.Symbol,
+		metadata.BaseUnitName,
+		metadata.SubUnitName,
+		metadata.UnitScale,
+		metadata.Memo,
+		metadata.PlannedTotalAmount,
+		metadata.IssuerTokens,
+		metadata.MintThreshold,
+		metadata.ReregistrationThreshold,
+		metadata.ExpireHeight,
+		metadata.MintedAmount,
+		metadata.BurnedAmount,
+	)
+	if err != nil {
+		return -1, err
+	}
+	return result.LastInsertId()
+}
+func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
+	rows, err := db.Query(`SELECT id,registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount
+								 FROM metadata  
+								WHERE identifier = ?`, identifier)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	metadata := &Metadata{}
+	for rows.Next() {
+		var id int64
+		var registeredTxID string
+		var version uint32
+		var identifier string
+		var name string
+		var symbol string
+		var baseUnitName string
+		var subUnitName string
+		var unitScale uint64
+		var memo string
+		var plannedTotalAmount uint64
+		var issuerTokens string
+		var mintThreshold uint8
+		var reregistrationThreshold uint8
+		var expireHeight int32
+		var mintedAmount uint64
+		var burnedAmount uint64
+
+		err = rows.Scan(
+			&id,
+			&registeredTxID,
+			&version,
+			&identifier,
+			&name,
+			&symbol,
+			&baseUnitName,
+			&subUnitName,
+			&unitScale,
+			&memo,
+			&plannedTotalAmount,
+			&issuerTokens,
+			&mintThreshold,
+			&reregistrationThreshold,
+			&expireHeight,
+			&mintedAmount,
+			&burnedAmount,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		metadata.ID = id
+		metadata.RegisteredTxID = registeredTxID
+		metadata.Version = version
+		metadata.Identifier = identifier
+		metadata.Name = name
+		metadata.Symbol = symbol
+		metadata.BaseUnitName = baseUnitName
+		metadata.SubUnitName = subUnitName
+		metadata.UnitScale = unitScale
+		metadata.Memo = memo
+		metadata.PlannedTotalAmount = plannedTotalAmount
+		metadata.IssuerTokens = issuerTokens
+		metadata.MintThreshold = mintThreshold
+		metadata.ReregistrationThreshold = reregistrationThreshold
+		metadata.ExpireHeight = expireHeight
+		metadata.MintedAmount = mintedAmount
+		metadata.BurnedAmount = burnedAmount
+	}
+	return metadata, err
+}
+func UpdateCTAUTMetadata(metadata *Metadata) error {
+	stmt, err := db.Prepare(`UPDATE metadata SET memo = ?, planned_total_amount = ?, issuer_tokens = ?, mint_threshold = ?, reregistration_threshold = ?, expire_height = ?, minted_amount = ?, burned_amount = ? WHERE id = ?`)
+	if err != nil {
+		return err
+	}
+	_, err = stmt.Exec(
+		metadata.Memo,
+		metadata.PlannedTotalAmount,
+		metadata.IssuerTokens,
+		metadata.MintThreshold,
+		metadata.ReregistrationThreshold,
+		metadata.ExpireHeight,
+		metadata.MintedAmount,
+		metadata.BurnedAmount,
+		metadata.ID,
+	)
+	return err
+}
+
 type Token struct {
 	ID            int64
 	AccountID     int64

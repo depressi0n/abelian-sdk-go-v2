@@ -103,6 +103,36 @@ func init() {
 	}
 	fmt.Println("Table tx created!")
 
+	stmt, err = db.Prepare(`CREATE TABLE IF NOT EXISTS metadata (
+    	ID INTEGER PRIMARY KEY,
+    	registered_tx_id TEXT,
+    	
+    	version INTEGER,
+    	identifier TEXT,
+    	name TEXT,
+    	symbol TEXT,
+    	base_unit_name TEXT,
+    	sub_unit_name TEXT,
+    	unit_scale INTEGER,
+    	memo TEXT,
+    	
+    	planned_total_amount INTEGER,
+    	issuer_tokens TEXT,
+    	mint_threshold INTEGER,
+    	reregistration_threshold INTEGER,
+    	expire_height INTEGER,
+    	
+    	minted_amount INTEGER,
+    	burned_amount INTEGER)`)
+	if err != nil {
+		panic(err)
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		return
+	}
+	fmt.Println("Table metadata created!")
+
 	stmt, err = db.Prepare(`CREATE TABLE IF NOT EXISTS ctaut (
 		ID INTEGER PRIMARY KEY,
 		account_id INTEGER,

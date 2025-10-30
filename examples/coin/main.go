@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian"
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
@@ -36,22 +37,23 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 			return err
 		}
 
-		if ctautScript.Type() == abelian.CTAUTTypeRegistration {
-			instance, err := abelian.RegisteredInstanceFromCTAUTScript(ctautScript, tx.Version, tx.TxHash, serializedTxOuts)
+		switch ctautScript.Type() {
+		case abelian.CTAUTTypeRegistration:
+			instance, err := abelian.RegisteredCTAUTMetadata(ctautScript, tx.Version, tx.TxHash, serializedTxOuts)
 			if err != nil {
 				return err
 			}
 			fmt.Println("Register CT-AUT instance: ", ctautScript.Identifier())
-			fmt.Println("\t Name: ", hex.EncodeToString(instance.CTAutName))
-			fmt.Println("\t Symbol: ", hex.EncodeToString(instance.CTAutSymbol))
-			fmt.Println("\t Base Unit Name: ", hex.EncodeToString(instance.BaseUnitName))
-			fmt.Println("\t Sub Unit Name: ", hex.EncodeToString(instance.SubUnitName))
+			fmt.Println("\t Name: ", instance.CTAutName)
+			fmt.Println("\t Symbol: ", instance.CTAutSymbol)
+			fmt.Println("\t Base Unit Name: ", instance.BaseUnitName)
+			fmt.Println("\t Sub Unit Name: ", instance.SubUnitName)
 			fmt.Println("\t Unit Scale: ", instance.UnitScale)
-			fmt.Println("\t Memo: ", hex.EncodeToString(instance.CTAutMemo))
+			fmt.Println("\t Memo: ", instance.CTAutMemo)
 
 			fmt.Printf("\t %d Issuer Tokens: \n", len(instance.IssuerTokens))
 			for i := 0; i < len(instance.IssuerTokens); i++ {
-				fmt.Println("\t\t", hex.EncodeToString(instance.IssuerTokens[i]))
+				fmt.Println("\t\t", instance.IssuerTokens[i])
 			}
 
 			fmt.Printf("\t %d Tokens: \n", len(tokens))
@@ -63,8 +65,84 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 			fmt.Println("\t Mint Threshold: ", instance.MintThreshold)
 			fmt.Println("\t Re-Registration Threshold: ", instance.ReregistrationThreshold)
 			fmt.Println("\t Expire Height: ", instance.ExpireHeight)
-		}
 
+			metadata := &database.Metadata{
+				RegisteredTxID:          tx.TxID,
+				Version:                 instance.Version,
+				Identifier:              instance.CTAutIdentifier[:],
+				Name:                    instance.CTAutName,
+				Symbol:                  instance.CTAutSymbol,
+				BaseUnitName:            instance.BaseUnitName,
+				SubUnitName:             instance.SubUnitName,
+				UnitScale:               instance.UnitScale,
+				Memo:                    instance.CTAutMemo,
+				PlannedTotalAmount:      instance.PlannedTotalSupply,
+				IssuerTokens:            strings.Join(instance.IssuerTokens, ";"),
+				MintThreshold:           instance.MintThreshold,
+				ReregistrationThreshold: instance.ReregistrationThreshold,
+				ExpireHeight:            instance.ExpireHeight,
+				MintedAmount:            0,
+				BurnedAmount:            0,
+			}
+			_, err = database.InsertCTAUTInstance(metadata)
+			if err != nil {
+				return err
+			}
+		case abelian.CTAUTTypeReRegistration:
+			fallthrough
+		case abelian.CTAUTTypeMint:
+			fallthrough
+		case abelian.CTAUTTypeTransfer:
+			fallthrough
+		case abelian.CTAUTTypeBurn:
+			// get instance from database
+			identifier := ctautScript.Identifier()
+			metadata, err := database.LoadCTAUTMetadata(hex.EncodeToString(identifier[:]))
+			if err != nil {
+				fmt.Errorf("fail to load CT-AUT instance: %v", err)
+				return err
+			}
+
+			ctAUTMetadata := &abelian.CTAUTMetadata{
+				Version:                 metadata.Version,
+				CTAutIdentifier:         hex.EncodeToString(identifier[:]),
+				CTAutName:               metadata.Name,
+				CTAutSymbol:             metadata.Symbol,
+				BaseUnitName:            metadata.BaseUnitName,
+				SubUnitName:             metadata.SubUnitName,
+				UnitScale:               metadata.UnitScale,
+				CTAutMemo:               metadata.Memo,
+				PlannedTotalSupply:      metadata.PlannedTotalAmount,
+				IssuerTokens:            strings.Split(metadata.IssuerTokens, ";"),
+				MintThreshold:           metadata.MintThreshold,
+				ReregistrationThreshold: metadata.ReregistrationThreshold,
+				ExpireHeight:            metadata.ExpireHeight,
+				MintedAmount:            metadata.MintedAmount,
+				BurnedAmount:            metadata.BurnedAmount,
+			}
+			ctAUTMetadata, err = abelian.UpdateMetadataFromCTAUTScript(ctautScript, tx.Version, tx.TxHash, serializedTxOuts, ctAUTMetadata)
+			if err != nil {
+				fmt.Errorf("fail to update instance: %s", err)
+				return err
+			}
+			metadata.Memo = ctAUTMetadata.CTAutMemo
+			metadata.PlannedTotalAmount = ctAUTMetadata.PlannedTotalSupply
+			metadata.IssuerTokens = strings.Join(ctAUTMetadata.IssuerTokens, ";")
+			metadata.MintThreshold = ctAUTMetadata.MintThreshold
+			metadata.ReregistrationThreshold = ctAUTMetadata.ReregistrationThreshold
+			metadata.ExpireHeight = ctAUTMetadata.ExpireHeight
+			metadata.MintedAmount = ctAUTMetadata.MintedAmount
+			metadata.BurnedAmount = ctAUTMetadata.BurnedAmount
+
+			// update instance to database
+			err = database.UpdateCTAUTMetadata(metadata)
+			if err != nil {
+				return err
+			}
+
+		default:
+			return fmt.Errorf("unsupported CT-AUT script type: %d", ctautScript.Type())
+		}
 	}
 
 	for index := 0; index < len(serializedTxOuts); index++ {

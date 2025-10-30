@@ -1,6 +1,8 @@
 package abelian
 
 import (
+	"fmt"
+
 	"github.com/pqabelian/abec/sdkapi/v2"
 
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
@@ -20,13 +22,46 @@ func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, 
 	return v2.ParseCTAUTScript(txVersion, txID, memo)
 }
 
-type CTAUTInstance = v2.Metadata
+type CTAUTMetadata = v2.Metadata
 
-func RegisteredInstanceFromCTAUTScript(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*CTAUTInstance, error) {
-	return v2.RegisteredCTAUTInstance(script, txVersion, txID, serializedTxOuts)
+func RegisteredCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*CTAUTMetadata, error) {
+	return v2.RegisteredCTAUTMetadata(script, txVersion, txID, serializedTxOuts)
 }
-func ReRegisteredInstanceFromCTAUTScript(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *CTAUTInstance) error {
-	return v2.ReRegisteredCTAUTInstance(script, txVersion, txID, serializedTxOuts, metadata)
+func UpdateMetadataFromCTAUTScript(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *CTAUTMetadata) (*CTAUTMetadata, error) {
+	if script == nil {
+		return nil, nil
+	}
+	var err error
+	switch script.(type) {
+	case *v2.CTAUTRegisterScript:
+		return nil, fmt.Errorf("UpdateMetadataFromCTAUTScript: the input script is a registration script, which should not be called on an existing instance")
+	case *v2.CTAUTReRegisterScript:
+		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		if err != nil {
+			return nil, err
+		}
+		return metadata, nil
+	case *v2.CTAUTMintScript:
+		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		if err != nil {
+			return nil, err
+		}
+		return metadata, nil
+	case *v2.CTAUTTransferScript:
+		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		if err != nil {
+			return nil, err
+		}
+		return metadata, nil
+	case *v2.CTAUTBurnScript:
+		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		if err != nil {
+			return nil, err
+		}
+		return metadata, nil
+	default:
+		return nil, fmt.Errorf("UpdateMetadataFromCTAUTScript: the input script is not supported")
+	}
 }
 
 func GetGeneratedCTAUTTokens(ctAutScript v2.CTAUTScript, txVersion uint32, txHash string, serializedTxOuts [][]byte) ([]*CTAUTToken, error) {
