@@ -3,7 +3,8 @@ package abelian
 import (
 	"bytes"
 	"fmt"
-	api "github.com/pqabelian/abec/sdkapi/v2"
+
+	api "github.com/abesuite/abec/sdkapi/v2"
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 	abelAddr "github.com/pqabelian/abeutil/address/instanceaddress"
 )

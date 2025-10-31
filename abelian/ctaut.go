@@ -3,7 +3,7 @@ package abelian
 import (
 	"fmt"
 
-	"github.com/pqabelian/abec/sdkapi/v2"
+	"github.com/abesuite/abec/sdkapi/v2"
 
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )

@@ -7,7 +7,7 @@ import (
 	"os"
 	"sort"
 
-	api "github.com/pqabelian/abec/sdkapi/v2"
+	api "github.com/abesuite/abec/sdkapi/v2"
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 

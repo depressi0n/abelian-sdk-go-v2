@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	api "github.com/pqabelian/abec/sdkapi/v2"
+	api "github.com/abesuite/abec/sdkapi/v2"
 	"golang.org/x/crypto/sha3"
 )
 

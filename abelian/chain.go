@@ -2,7 +2,8 @@ package abelian
 
 import (
 	"fmt"
-	api "github.com/pqabelian/abec/sdkapi/v2"
+
+	api "github.com/abesuite/abec/sdkapi/v2"
 )
 
 type NetworkID uint8

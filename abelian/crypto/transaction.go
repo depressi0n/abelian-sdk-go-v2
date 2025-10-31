@@ -3,7 +3,7 @@ package crypto
 import (
 	"os"
 
-	api "github.com/pqabelian/abec/sdkapi/v2"
+	api "github.com/abesuite/abec/sdkapi/v2"
 )
 
 func GenerateTransferTransactionByRootSeeds(transactionRequest []byte, serializedCryptoSeeds [][]byte) ([]byte, []byte, error) {
