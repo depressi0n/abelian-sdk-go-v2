@@ -81,7 +81,7 @@ func NewCoinAddress(data []byte) (CoinAddress, error) {
 				data: data,
 			}
 		} else if data[0] == uint8(COIN_ADDRESS_TYPE_PSEUDONYMCT) {
-			coinAddress = &CoinAddressPseudonym{
+			coinAddress = &CoinAddressPseudonymCT{
 				data: data,
 			}
 		} else {
@@ -99,6 +99,7 @@ func NewCoinAddress(data []byte) (CoinAddress, error) {
 var _ CoinAddress = &CoinAddressFullPrivacyPre{}
 var _ CoinAddress = &CoinAddressFullPrivacy{}
 var _ CoinAddress = &CoinAddressPseudonym{}
+var _ CoinAddress = &CoinAddressPseudonymCT{}
 
 type CoinAddressFullPrivacyPre struct {
 	data []byte
@@ -245,7 +246,7 @@ const (
 	CRYPTO_ADDRESS_LENGTH_FULL_PRIVACT_PRE  = 10696
 	CRYPTO_ADDRESS_LENGTH_FULL_PRIVACY_RAND = 10826
 	CRYPTO_ADDRESS_LENGTH_PSEUDONYM         = 198
-	CRYPTO_ADDRESS_LENGTH_PSEUDONYMCT       = 1391
+	CRYPTO_ADDRESS_LENGTH_PSEUDONYMCT       = 1386
 )
 
 // CryptoAddress encapsulated coin address for upper layer

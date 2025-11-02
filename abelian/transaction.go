@@ -217,21 +217,34 @@ func SortTxInDescWithRing(txIndescs []*TxInDescWithRing) error {
 		coinAddressIPrivacyLevel, _ := crypto.GetTxoPrivacyLevel(txIndescs[i].TxVersion, txIndescs[i].TxOutData)
 		coinAddressJPrivacyLevel, _ := crypto.GetTxoPrivacyLevel(txIndescs[j].TxVersion, txIndescs[j].TxOutData)
 
-		isPseudonymousI := coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonym || coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT
-		isPseudonymousJ := coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym || coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT
-		if isPseudonymousI && !isPseudonymousJ {
-			return false
-		}
-		if !isPseudonymousI && isPseudonymousJ {
+		// Part I  [crypto.PrivacyLevelFullPrivacyPre, crypto.PrivacyLevelFullPrivacyRand]
+		// Part II [crypto.PrivacyLevelPseudonym, crypto.PrivacyLevelPseudonymCT]
+		if coinAddressIPrivacyLevel < crypto.PrivacyLevelPseudonym &&
+			coinAddressJPrivacyLevel >= crypto.PrivacyLevelPseudonym {
 			return true
 		}
-		if !isPseudonymousI && !isPseudonymousJ {
-			return false
-		}
+
+		// Part I keep the origin order
+
+		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
 		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
-			coinAddressJPrivacyLevel != crypto.PrivacyLevelPseudonymCT {
+			txIndescs[i].CoinValue == 1 {
 			return true
 		}
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			txIndescs[j].CoinValue == 1 {
+			return false
+		}
+		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
+		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym {
+			return true
+		}
+		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
+			coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonym {
+			return false
+		}
+
 		return false
 	})
 	return nil

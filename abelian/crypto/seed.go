@@ -235,13 +235,13 @@ func NewRootSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 		coinDetectorKey:         coinDetectorKey,
 		publicRand:              nil,
 	}
-	if privacyLevel == PrivacyLevelPseudonymCT {
-		seed.coinSerialNumberKeySeed = nil
-		//seed.coinValueKeySeed = nil
-	}
 	if privacyLevel == PrivacyLevelPseudonym {
 		seed.coinSerialNumberKeySeed = nil
 		seed.coinValueKeySeed = nil
+	}
+	if privacyLevel == PrivacyLevelPseudonymCT {
+		seed.coinSerialNumberKeySeed = nil
+		//seed.coinValueKeySeed = nil
 	}
 	return seed, nil
 }
@@ -276,12 +276,12 @@ func NewRandSeeds(cryptoScheme CryptoScheme, privacyLevel PrivacyLevel,
 		seed.coinDetectorKey = coinDetectorKey
 		seed.publicRand = publicRand
 
-		if privacyLevel == PrivacyLevelPseudonymCT {
-			seed.coinSerialNumberKeySeed = nil
-		}
 		if privacyLevel == PrivacyLevelPseudonym {
 			seed.coinSerialNumberKeySeed = nil
 			seed.coinValueKeySeed = nil
+		}
+		if privacyLevel == PrivacyLevelPseudonymCT {
+			seed.coinSerialNumberKeySeed = nil
 		}
 	default:
 		return nil, ErrInvalidCryptoScheme

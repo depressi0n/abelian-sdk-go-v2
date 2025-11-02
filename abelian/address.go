@@ -13,6 +13,7 @@ const (
 	ABEL_ADDRESS_LENGTH_FULL_PRIVACT_PRE = 10729
 	ABEL_ADDRESS_LENGTH_RINGCT           = 10859
 	ABEL_ADDRESS_LENGTH_PSEUDONYM        = 231
+	ABEL_ADDRESS_LENGTH_PSEUDONYM_CT     = 1419
 )
 
 // AbelAddress encapsulated crypto address for application layer
@@ -29,11 +30,13 @@ func (address *AbelAddress) Data() []byte {
 func (address *AbelAddress) Validate() error {
 	if len(address.data) != ABEL_ADDRESS_LENGTH_FULL_PRIVACT_PRE &&
 		len(address.data) != ABEL_ADDRESS_LENGTH_RINGCT &&
-		len(address.data) != ABEL_ADDRESS_LENGTH_PSEUDONYM {
-		return fmt.Errorf("abel address data length is not one of {%d,%d,%d}",
+		len(address.data) != ABEL_ADDRESS_LENGTH_PSEUDONYM &&
+		len(address.data) != ABEL_ADDRESS_LENGTH_PSEUDONYM_CT {
+		return fmt.Errorf("abel address data length is not one of {%d,%d,%d,%d}",
 			ABEL_ADDRESS_LENGTH_FULL_PRIVACT_PRE,
 			ABEL_ADDRESS_LENGTH_RINGCT,
 			ABEL_ADDRESS_LENGTH_PSEUDONYM,
+			ABEL_ADDRESS_LENGTH_PSEUDONYM_CT,
 		)
 	}
 
