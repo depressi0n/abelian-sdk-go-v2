@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 
+	"github.com/pqabelian/abelian-sdk-go-v2/abelian"
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 
@@ -18,6 +20,29 @@ func GenerateAddress(serializedSeeds []byte) {
 	fmt.Printf("SerialNoSecretKey: %d bytes | %x\n", len(cryptoKeysAndAddress.SerialNoSecretKey), cryptoKeysAndAddress.SerialNoSecretKey)
 	fmt.Printf("ViewSecretKey: %d bytes | %x\n", len(cryptoKeysAndAddress.ViewSecretKey), cryptoKeysAndAddress.ViewSecretKey)
 	fmt.Printf("DetectorKey: %d bytes | %x\n", len(cryptoKeysAndAddress.DetectorKey), cryptoKeysAndAddress.DetectorKey)
+
+	cryptoAddress, err := crypto.NewCryptoAddress(cryptoKeysAndAddress.CryptoAddress.Data())
+	if err != nil {
+		panic(fmt.Errorf("fail to create crypto address: %v", err))
+	}
+	if err = cryptoAddress.Validate(); err != nil {
+		panic(fmt.Errorf("fail to validate crypto address: %v", err))
+	}
+	if !bytes.Equal(cryptoAddress.Data(), cryptoKeysAndAddress.CryptoAddress.Data()) {
+		panic(fmt.Errorf("crypto address data mismatch"))
+	}
+
+	abelAddress1 := abelian.NewAbelAddressFromCryptoAddress(abelian.MainNet, cryptoAddress)
+	abelAddress2, err := abelian.NewAbelAddress(abelAddress1.Data())
+	if err != nil {
+		panic(fmt.Errorf("fail to create abel address: %v", err))
+	}
+	if err = abelAddress2.Validate(); err != nil {
+		panic(fmt.Errorf("fail to validate abel address: %v", err))
+	}
+	if !bytes.Equal(abelAddress1.Data(), abelAddress2.Data()) {
+		panic(fmt.Errorf("abel address data mismatch"))
+	}
 }
 
 func main() {
