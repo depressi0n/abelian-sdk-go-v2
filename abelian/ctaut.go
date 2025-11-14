@@ -16,16 +16,16 @@ type CTAUTToken struct {
 	ValueScript  []byte
 }
 
-type CTAUTScript = v2.CTAUTScript
+type CTAUTScript = v2.AutScript
 
 func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, error) {
-	return v2.ParseCTAUTScript(txVersion, txID, memo)
+	return v2.ParseAutScript(txVersion, txID, memo)
 }
 
 type CTAUTMetadata = v2.Metadata
 
 func RegisteredCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*CTAUTMetadata, error) {
-	return v2.RegisteredCTAUTMetadata(script, txVersion, txID, serializedTxOuts)
+	return v2.RegisteredAutMetadata(script, txVersion, txID, serializedTxOuts)
 }
 func UpdateMetadataFromCTAUTScript(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *CTAUTMetadata) (*CTAUTMetadata, error) {
 	if script == nil {
@@ -36,25 +36,25 @@ func UpdateMetadataFromCTAUTScript(script CTAUTScript, txVersion uint32, txID st
 	case *v2.CTAUTRegisterScript:
 		return nil, fmt.Errorf("UpdateMetadataFromCTAUTScript: the input script is a registration script, which should not be called on an existing instance")
 	case *v2.CTAUTReRegisterScript:
-		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		err = v2.UpdateAutMetadata(script, txVersion, txID, serializedTxOuts, metadata)
 		if err != nil {
 			return nil, err
 		}
 		return metadata, nil
 	case *v2.CTAUTMintScript:
-		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		err = v2.UpdateAutMetadata(script, txVersion, txID, serializedTxOuts, metadata)
 		if err != nil {
 			return nil, err
 		}
 		return metadata, nil
 	case *v2.CTAUTTransferScript:
-		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		err = v2.UpdateAutMetadata(script, txVersion, txID, serializedTxOuts, metadata)
 		if err != nil {
 			return nil, err
 		}
 		return metadata, nil
 	case *v2.CTAUTBurnScript:
-		err = v2.UpdateCTAUTMetadata(script, txVersion, txID, serializedTxOuts, metadata)
+		err = v2.UpdateAutMetadata(script, txVersion, txID, serializedTxOuts, metadata)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +64,7 @@ func UpdateMetadataFromCTAUTScript(script CTAUTScript, txVersion uint32, txID st
 	}
 }
 
-func GetGeneratedCTAUTTokens(ctAutScript v2.CTAUTScript, txVersion uint32, txHash string, serializedTxOuts [][]byte) ([]*CTAUTToken, error) {
+func GetGeneratedCTAUTTokens(ctAutScript v2.AutScript, txVersion uint32, txHash string, serializedTxOuts [][]byte) ([]*CTAUTToken, error) {
 	version, outpoints, scripts, err := v2.GetGeneratedOutpoints(ctAutScript, txVersion, txHash, serializedTxOuts)
 	if err != nil {
 		return nil, err
