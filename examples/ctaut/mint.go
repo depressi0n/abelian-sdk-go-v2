@@ -10,22 +10,25 @@ import (
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/database"
 )
 
-func mintCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, mintThreshold uint8) {
+func mintCTAUT(identifier abelian.AutId, mintThreshold uint8) {
 	pseudonymCTAccount, err := database.LoadAccountByID(5)
 	if err != nil {
 		panic("fail to load account with id 5")
 	}
 
 	// And then generated address
+	fmt.Println("generating fiona")
 	fionaAbelAddress, err := pseudonymCTAccount.GenerateAbelAddress()
 	if err != nil {
 		panic("fail to generated change address for account")
 	}
+	fmt.Println("generating galileo")
 	galileoAbelAddress, err := pseudonymCTAccount.GenerateAbelAddress()
 	if err != nil {
 		panic("fail to generated change address for account")
 	}
 
+	fmt.Println("generating change")
 	changeAddress, err := pseudonymCTAccount.GenerateAbelAddress()
 	if err != nil {
 		panic("fail to generated change address for account")
@@ -39,7 +42,7 @@ func mintCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, mintThreshold uin
 
 	// Load root tokens of specified account
 	selectAccountIDs := []int64{5}
-	rootTokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], hex.EncodeToString(identifier[:]), true)
+	rootTokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], identifier.String(), true)
 	if err != nil {
 		panic(err)
 	}
@@ -72,7 +75,7 @@ func mintCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, mintThreshold uin
 	// For simplicity, we make it already for output
 
 	txMemo, autWitness, err := abelian.CreateCTAUTMintScript(
-		abelian.TxVersionCTAUT,
+		abelian.AutScriptVersion,
 		identifier,
 		vin,
 		uint8(len(filterRootTokens)),
@@ -175,7 +178,7 @@ func mintCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, mintThreshold uin
 			TxoRing:     ringDetail,
 		}
 
-		fmt.Printf("%#+v", txIndesc)
+		//fmt.Printf("%#+v", txIndesc)
 		txInDescs = append(txInDescs, txIndesc)
 		coin2AccountID[coin.Coin.ID().String()] = coin.AccountID
 	}
@@ -224,7 +227,7 @@ func mintCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, mintThreshold uin
 		panic(fmt.Errorf("fail to generate unsigned raw tx: %v", err))
 	}
 	unsignedRawTx.AutWitness = autWitness
-	fmt.Println(unsignedRawTx)
+	//fmt.Println(unsignedRawTx)
 
 	// Sign transaction
 	signedRawTx, err := SignRawTransactionForCTAUT(unsignedRawTx, senderAccountIDs)

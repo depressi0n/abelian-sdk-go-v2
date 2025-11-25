@@ -31,35 +31,22 @@ func main() {
 	// 1. register
 	registerCTAUT()
 
+	// fill in the txid
+	identifier, err := abelian.NewAutId("0c0f58a00e08c6b2efb849dca83f59e22be4986f26adc4a1a4f4b921eb0abe25")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("identifier: ", identifier.String())
+
 	// 2. reregister
-	//identifier, err := abelian.CTAUTIdentifierKey("e93b0f0d04415e76fd27f95b49b6b9e394883f8154777f5aa63e84f2ceef51bf")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println("identifier: ", hex.EncodeToString(identifier[:]))
 	//reRegisterCTAUT(identifier, 1)
 
 	// 3. mint
-	//identifier, err := abelian.CTAUTIdentifierKey("e93b0f0d04415e76fd27f95b49b6b9e394883f8154777f5aa63e84f2ceef51bf")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println("identifier: ", hex.EncodeToString(identifier[:]))
 	//mintCTAUT(identifier, 1)
 
 	// 4. transfer
-	//identifier, err := abelian.CTAUTIdentifierKey("e93b0f0d04415e76fd27f95b49b6b9e394883f8154777f5aa63e84f2ceef51bf")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println("identifier: ", hex.EncodeToString(identifier[:]))
 	//transferCTAUT(identifier)
 
 	// 5. burn
-	//identifier, err := abelian.CTAUTIdentifierKey("e93b0f0d04415e76fd27f95b49b6b9e394883f8154777f5aa63e84f2ceef51bf")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println("identifier: ", hex.EncodeToString(identifier[:]))
 	//burnCTAUT(identifier)
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/database"
 )
 
-func transferCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
+func transferCTAUT(identifier abelian.AutId) {
 	pseudonymCTAccount, err := database.LoadAccountByID(5)
 	if err != nil {
 		panic("fail to load account with id 5")
@@ -51,7 +51,7 @@ func transferCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 
 	// Load CT-AUT Tokens of specified account
 	selectAccountIDs := []int64{5}
-	tokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], hex.EncodeToString(identifier[:]), false)
+	tokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], identifier.String(), false)
 	if err != nil {
 		panic(err)
 	}
@@ -93,6 +93,7 @@ func transferCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 		if selectedTokens[j].TokenType == 0 { // hidden
 			return false
 		}
+
 		return false
 	})
 
@@ -108,7 +109,7 @@ func transferCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 	}
 
 	txMemo, autWitness, err := abelian.CreateCTAUTTransferScript(
-		abelian.TxVersionCTAUT,
+		abelian.AutScriptVersion,
 		identifier,
 		consumedTokens,
 		recipients,
@@ -264,7 +265,7 @@ func transferCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 		panic(fmt.Errorf("fail to generate unsigned raw tx: %v", err))
 	}
 	unsignedRawTx.AutWitness = autWitness
-	fmt.Println(unsignedRawTx)
+	//fmt.Println(unsignedRawTx)
 
 	// Sign transaction
 	signedRawTx, err := SignRawTransactionForCTAUT(unsignedRawTx, senderAccountIDs)

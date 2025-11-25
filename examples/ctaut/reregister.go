@@ -10,7 +10,7 @@ import (
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/database"
 )
 
-func reRegisterCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, reRegisterThreshold uint8) {
+func reRegisterCTAUT(identifier abelian.AutId, reRegisterThreshold uint8) {
 	pseudonymCTAccount, err := database.LoadAccountByID(5)
 	if err != nil {
 		panic("fail to load account with id 5")
@@ -44,7 +44,7 @@ func reRegisterCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, reRegisterT
 
 	// Load coins of specified account
 	selectAccountIDs := []int64{5}
-	rootTokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], hex.EncodeToString(identifier[:]), true)
+	rootTokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], identifier.String(), true)
 	if err != nil {
 		panic(err)
 	}
@@ -70,7 +70,7 @@ func reRegisterCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, reRegisterT
 		issuerTokens = append(issuerTokens, address.GetCryptoAddress().GetCoinAddress().Data())
 	}
 	txMemo, autWitness, err := abelian.CreateCTAUTReRegisterScript(
-		abelian.TxVersionCTAUT,
+		abelian.AutScriptVersion,
 		identifier,
 		[]byte("Post-Quantum USD on the world"),
 		uint64(1)<<51-1,
@@ -230,7 +230,7 @@ func reRegisterCTAUT(identifier [abelian.CTAUTIdentifierLength]byte, reRegisterT
 		panic(fmt.Errorf("fail to generate unsigned raw tx: %v", err))
 	}
 	unsignedRawTx.AutWitness = autWitness
-	fmt.Println(unsignedRawTx)
+	//fmt.Println(unsignedRawTx)
 
 	// Sign transaction
 	signedRawTx, err := SignRawTransactionForCTAUT(unsignedRawTx, senderAccountIDs)

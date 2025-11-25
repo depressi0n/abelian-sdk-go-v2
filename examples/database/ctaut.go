@@ -13,7 +13,7 @@ type Metadata struct {
 	Memo           string
 
 	PlannedTotalAmount      uint64
-	IssuerTokens            string
+	Issuers                 string
 	MintThreshold           uint8
 	ReregistrationThreshold uint8
 	ExpireHeight            int32
@@ -54,7 +54,7 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 		metadata.UnitScale,
 		metadata.Memo,
 		metadata.PlannedTotalAmount,
-		metadata.IssuerTokens,
+		metadata.Issuers,
 		metadata.MintThreshold,
 		metadata.ReregistrationThreshold,
 		metadata.ExpireHeight,
@@ -129,7 +129,7 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 		metadata.UnitScale = unitScale
 		metadata.Memo = memo
 		metadata.PlannedTotalAmount = plannedTotalAmount
-		metadata.IssuerTokens = issuerTokens
+		metadata.Issuers = issuerTokens
 		metadata.MintThreshold = mintThreshold
 		metadata.ReregistrationThreshold = reregistrationThreshold
 		metadata.ExpireHeight = expireHeight
@@ -146,7 +146,7 @@ func UpdateCTAUTMetadata(metadata *Metadata) error {
 	_, err = stmt.Exec(
 		metadata.Memo,
 		metadata.PlannedTotalAmount,
-		metadata.IssuerTokens,
+		metadata.Issuers,
 		metadata.MintThreshold,
 		metadata.ReregistrationThreshold,
 		metadata.ExpireHeight,

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian"
@@ -10,7 +11,7 @@ import (
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/database"
 )
 
-func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
+func burnCTAUT(identifier abelian.AutId) {
 	pseudonymCTAccount, err := database.LoadAccountByID(5)
 	if err != nil {
 		panic("fail to load account with id 5")
@@ -26,14 +27,16 @@ func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 		panic("fail to generated change address for account")
 	}
 
-	// note that the token of first recipient would be mark burned for CT-AUT
+	// note that the token of last recipient would be mark burned for CT-AUT, which must be plain token
+	// note that for all token, CT-token must occur before Plain-Token
 	receiverAddresses := [][]byte{
 		joyAbelAddress,
 	}
-	recipientValues := []uint64{2700}
+	recipientValues := []uint64{200}
+	burnedTokenValue := uint64(100)
 
 	targetTokenValue := uint64(0)
-	recipients := make([]*abelian.Recipient, 0, len(receiverAddresses))
+	recipients := make([]*abelian.Recipient, 0, len(receiverAddresses)+1)
 	for i := 0; i < len(receiverAddresses); i++ {
 		abelAddress, _ := abelian.NewAbelAddress(receiverAddresses[i])
 
@@ -45,9 +48,19 @@ func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 		targetTokenValue += recipientValues[i]
 	}
 
+	// for burning
+	abelAddress, _ := abelian.NewAbelAddress(joyAbelAddress)
+	receiverAddresses = append(receiverAddresses, joyAbelAddress)
+	recipients = append(recipients, &abelian.Recipient{
+		CryptoAddress: *abelAddress.GetCryptoAddress(),
+		Value:         burnedTokenValue,
+		HideValue:     false, // note that the burn-token must be plain token
+	})
+	targetTokenValue += burnedTokenValue
+
 	// Load CT-AUT Tokens of specified account
 	selectAccountIDs := []int64{5}
-	tokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], hex.EncodeToString(identifier[:]), false)
+	tokens, err := database.LoadCTAUTTokenByAccountID(selectAccountIDs[0], identifier.String(), false)
 	if err != nil {
 		panic(err)
 	}
@@ -63,13 +76,15 @@ func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 		selectedValue += token.Value
 	}
 	if selectedValue < targetTokenValue {
-		panic("CT-Token token value is not enough for transfer")
+		panic("CT-Token token value is not enough for burn")
 	}
 	if selectedValue-targetTokenValue != 0 {
 		change, _ := abelian.NewAbelAddress(changeAddress)
 
 		receiverAddresses = append(receiverAddresses, changeAddress)
-		recipients = append(recipients, &abelian.Recipient{
+		// note that the token of last recipient would be mark burned for CT-AUT, which must be plain token
+		// so the change is inserted before that one
+		recipients = slices.Insert(recipients, len(recipients)-1, &abelian.Recipient{
 			CryptoAddress: *change.GetCryptoAddress(),
 			Value:         selectedValue - targetTokenValue,
 			HideValue:     false,
@@ -86,7 +101,7 @@ func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 		if selectedTokens[i].TokenType == 0 { // hidden
 			return true
 		}
-		if selectedTokens[j].TokenType == 0 { // hidden
+		if selectedTokens[j].TokenType == 0 {
 			return false
 		}
 		return false
@@ -104,7 +119,7 @@ func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 	}
 
 	txMemo, autWitness, err := abelian.CreateCTAUTBurnScript(
-		abelian.TxVersionCTAUT,
+		abelian.AutScriptVersion,
 		identifier,
 		consumedTokens,
 		recipients,
@@ -258,7 +273,7 @@ func burnCTAUT(identifier [abelian.CTAUTIdentifierLength]byte) {
 		panic(fmt.Errorf("fail to generate unsigned raw tx: %v", err))
 	}
 	unsignedRawTx.AutWitness = autWitness
-	fmt.Println(unsignedRawTx)
+	//fmt.Println(unsignedRawTx)
 
 	// Sign transaction
 	signedRawTx, err := SignRawTransactionForCTAUT(unsignedRawTx, senderAccountIDs)

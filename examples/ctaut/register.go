@@ -48,7 +48,7 @@ func registerCTAUT() {
 	}
 
 	txMemo, autWitness, err := abelian.CreateCTAUTRegisterScript(
-		abelian.TxVersionCTAUT,
+		abelian.AutScriptVersion,
 		[]byte("Post-Quantum USD"),
 		[]byte("PQUSD"),
 		[]byte("USD"),
@@ -230,11 +230,8 @@ func registerCTAUT() {
 		}
 	}
 
-	registeredIdentifier, err := abelian.CTAUTIdentifierKey(signedRawTx.TxID)
-	if err != nil {
-		panic(err)
-	}
+	registeredIdentifier := signedRawTx.TxID
 
 	// record the identifier for later re-register/mint/transfer/burn
-	fmt.Println("identifier: ", hex.EncodeToString(registeredIdentifier[:]))
+	fmt.Println("identifier: ", registeredIdentifier)
 }
