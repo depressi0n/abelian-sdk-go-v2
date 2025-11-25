@@ -8,7 +8,13 @@ import (
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 
-const TxVersionCTAUT = v2.TxVersionCTAUT
+const AutScriptVersion = v2.AutScriptVersion
+
+type AutId = v2.AutId
+
+func NewAutId(autIdentifier string) (AutId, error) {
+	return v2.NewAutId(autIdentifier)
+}
 
 type CTAUTToken struct {
 	Version      uint32
@@ -24,8 +30,8 @@ func ParseCTAUTScript(txVersion uint32, txID string, memo []byte) (CTAUTScript, 
 
 type CTAUTMetadata = v2.Metadata
 
-func RegisteredCTAUTMetadata(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte) (*CTAUTMetadata, error) {
-	return v2.RegisteredAutMetadata(script, txVersion, txID, serializedTxOuts)
+func RegisteredCTAUTMetadata(script CTAUTScript, scriptVersion uint32, txID string, serializedTxOuts [][]byte) (*CTAUTMetadata, error) {
+	return v2.RegisteredAutMetadata(script, scriptVersion, txID, serializedTxOuts)
 }
 func UpdateMetadataFromCTAUTScript(script CTAUTScript, txVersion uint32, txID string, serializedTxOuts [][]byte, metadata *CTAUTMetadata) (*CTAUTMetadata, error) {
 	if script == nil {
@@ -110,16 +116,16 @@ func GetConsumedTokenOutpoint(serializedTx []byte, rings []*CoinRing) ([]*OutPoi
 	return res, nil
 }
 
-const CTAUTIdentifierLength = v2.CTAUTIdentifierLength
+const CTAUTIdentifierLength = v2.AutIdentifierLength
 
-type CTAUTScriptType = v2.CTAUTScriptType
+type CTAUTScriptType = v2.AutScriptType
 
 const (
-	CTAUTTypeRegistration   CTAUTScriptType = v2.CTAUTTypeRegistration
-	CTAUTTypeReRegistration CTAUTScriptType = v2.CTAUTTypeReRegistration
-	CTAUTTypeMint           CTAUTScriptType = v2.CTAUTTypeMint
-	CTAUTTypeTransfer       CTAUTScriptType = v2.CTAUTTypeTransfer
-	CTAUTTypeBurn           CTAUTScriptType = v2.CTAUTTypeBurn
+	CTAUTTypeRegistration   CTAUTScriptType = v2.AutScriptTypeRegistration
+	CTAUTTypeReRegistration CTAUTScriptType = v2.AutScriptTypeReRegistration
+	CTAUTTypeMint           CTAUTScriptType = v2.AutScriptTypeMint
+	CTAUTTypeTransfer       CTAUTScriptType = v2.AutScriptTypeTransfer
+	CTAUTTypeBurn           CTAUTScriptType = v2.AutScriptTypeBurn
 )
 
 type CTAUTRegisterScript = v2.CTAUTRegisterScript
@@ -140,8 +146,10 @@ func CreateCTAUTRegisterScript(version uint32, name []byte, symbol []byte,
 		version,
 		name, symbol,
 		baseUnitName, subUnitName, unitScale,
-		autMemo, plannedTotalAmount, issuerTokens, mintThreshold, reRegisterThreshold,
-		expiryBlock, OutAutRootCoinNum, memo,
+		autMemo, plannedTotalAmount,
+		issuerTokens, expiryBlock,
+		reRegisterThreshold, mintThreshold,
+		OutAutRootCoinNum, memo,
 	)
 }
 
@@ -160,7 +168,9 @@ func CreateCTAUTReRegisterScript(version uint32,
 	return v2.NewReRegistrationScript(
 		version,
 		identifier,
-		autMemo, plannedTotalAmount, issuerTokens, mintThreshold, reregisterThreshold, expiryBlock,
+		autMemo, plannedTotalAmount,
+		issuerTokens, expiryBlock,
+		reregisterThreshold, mintThreshold,
 		inAutRootTokenNum, outAutRootTokenNum,
 		memo,
 	)
@@ -210,7 +220,7 @@ func NewInputTokenDesc(version uint32, valueScript []byte, cryptoValuePublicKey 
 }
 
 func CreateCTAUTTransferScript(version uint32,
-	identifier [CTAUTIdentifierLength]byte,
+	identifier AutId,
 	consumedToken []*InputTokenDesc, recipients []*Recipient,
 	memo []byte,
 ) ([]byte, []byte, error) {
@@ -272,8 +282,4 @@ func CreateCTAUTBurnScript(version uint32,
 
 	return v2.NewBurnScript(version, identifier, autTxInputDescs, autTxOutputDescs, memo)
 
-}
-
-func CTAUTIdentifierKey(txID string) ([CTAUTIdentifierLength]byte, error) {
-	return v2.CTAUTIdentifierKey(txID)
 }
