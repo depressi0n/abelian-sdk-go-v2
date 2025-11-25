@@ -48,13 +48,13 @@ func SortTxInDescs(txIndescs []*TxInDesc) error {
 
 		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
 		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
-			txIndescs[i].CoinValue == 1 {
-			return true
-		}
-		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
-			txIndescs[j].CoinValue == 1 {
+			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT {
+			if txIndescs[i].CoinValue == 1 && txIndescs[j].CoinValue != 1 {
+				return true
+			}
 			return false
 		}
+
 		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
 		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
 			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym {
@@ -91,13 +91,13 @@ func SortTxOutDesc(txOutdescs []*TxOutDesc) error {
 
 		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
 		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
-			txOutdescs[i].CoinValue == 1 {
-			return true
-		}
-		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
-			txOutdescs[j].CoinValue == 1 {
+			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT {
+			if txOutdescs[i].CoinValue == 1 && txOutdescs[j].CoinValue != 1 {
+				return true
+			}
 			return false
 		}
+
 		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
 		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
 			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonym {
@@ -228,11 +228,10 @@ func SortTxInDescWithRing(txIndescs []*TxInDescWithRing) error {
 
 		// Part II-I [ (crypto.PrivacyLevelPseudonymCT,1) (crypto.PrivacyLevelPseudonymCT,1) ... ]
 		if coinAddressIPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
-			txIndescs[i].CoinValue == 1 {
-			return true
-		}
-		if coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT &&
-			txIndescs[j].CoinValue == 1 {
+			coinAddressJPrivacyLevel == crypto.PrivacyLevelPseudonymCT {
+			if txIndescs[i].CoinValue == 1 && txIndescs[j].CoinValue != 1 {
+				return true
+			}
 			return false
 		}
 		// Part II-II [ (crypto.PrivacyLevelPseudonymCT,*) (crypto.PrivacyLevelPseudonym,*) ]
