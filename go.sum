@@ -4,6 +4,12 @@ github.com/abesuite/abec v1.0.1-0.20251112094413-fc74e64b3824 h1:H64hMYqk4jsqidC
 github.com/abesuite/abec v1.0.1-0.20251112094413-fc74e64b3824/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
 github.com/abesuite/abec v1.0.1-0.20251114084236-eeca54c692b1 h1:eGdF6kVnUnnFe8dO2V0oczjf/GSnUJSTqRhi7CKsK5g=
 github.com/abesuite/abec v1.0.1-0.20251114084236-eeca54c692b1/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
+github.com/abesuite/abec v1.0.1-0.20251124073721-2208d9f02851 h1:ARloE3v2JK81sq0LHdh3I7NGHzWobAVECEiZJJVinNk=
+github.com/abesuite/abec v1.0.1-0.20251124073721-2208d9f02851/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
+github.com/abesuite/abec v1.0.1-0.20251124081459-a9c07852bb05 h1:ocUuGZdmfFXdZ7ZSlZE5iwcATpBtK9+QesOGzBEjQl8=
+github.com/abesuite/abec v1.0.1-0.20251124081459-a9c07852bb05/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
+github.com/abesuite/abec v1.0.1-0.20251125144652-5ad4cca53b42 h1:FefPN1eY9oSFWqKXGmW9uwQ1kvQp/ZMFXDMSdJSsATQ=
+github.com/abesuite/abec v1.0.1-0.20251125144652-5ad4cca53b42/go.mod h1:CqMaTaBYZOcGaqCqbQDgKNwCMAeaD4vosk1iyVjAg1M=
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd h1:BNI2MkhhtofxM0sTP8WmdcT4chaAKZOsyhspB58DSrM=
 github.com/abesuite/go-socks v0.0.0-20170105172521-4720035b7bfd/go.mod h1:eo8+6JwPaqdnrzzGmGXEH3nOYknOkk8GtuXw7Bo+f08=
 github.com/abesuite/go-spew v1.1.1 h1:8v1IQu/pRuElOpgwrBLmtxsSTEEK+fCBBOw4VYE9fx8=
@@ -60,6 +66,8 @@ github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c h1:ncq/mPwQF
 github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
 github.com/pqabelian/abelian-aip11-go v0.0.0-20241209075354-09202e9533a5 h1:SQVeqIC3jMx+KgGJaAcN0aUJdSHBjxLHtmcX+2x8XbE=
 github.com/pqabelian/abelian-aip11-go v0.0.0-20241209075354-09202e9533a5/go.mod h1:nZshVYBaaERLQ3H2ViQ0te7xDkaNrw8NtVPBsa4bR/Q=
+github.com/pqabelian/abelian-aip11-go v0.0.0-20251105063917-baa94431c9cb h1:0LUfJXR5f5koI/Iwazhb/zGA7AODIYTdh9mA5cnNjdE=
+github.com/pqabelian/abelian-aip11-go v0.0.0-20251105063917-baa94431c9cb/go.mod h1:nZshVYBaaERLQ3H2ViQ0te7xDkaNrw8NtVPBsa4bR/Q=
 github.com/pqabelian/abeutil v0.0.0-20231107022913-d6d3bf295938 h1:zONjJzpgNvAqNFzFQjL6nhSaclegMdFLFLMwrImwxNM=
 github.com/pqabelian/abeutil v0.0.0-20231107022913-d6d3bf295938/go.mod h1:kZhOujT1b8QyruSMsG1gAlFmoWBU4lqsbC5j9+FrKxQ=
 github.com/shirou/gopsutil/v3 v3.23.7 h1:C+fHO8hfIppoJ1WdsVm1RoI0RwXoNdfTK7yWXV0wVj4=

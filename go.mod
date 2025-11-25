@@ -5,10 +5,10 @@ go 1.23.2
 toolchain go1.23.4
 
 require (
-	github.com/abesuite/abec v1.0.1-0.20251114084236-eeca54c692b1
+	github.com/abesuite/abec v1.0.1-0.20251125144652-5ad4cca53b42
 	github.com/jrick/logrotate v1.0.0
 	github.com/mattn/go-sqlite3 v1.14.22
-	github.com/pqabelian/abelian-aip11-go v0.0.0-20241209075354-09202e9533a5
+	github.com/pqabelian/abelian-aip11-go v0.0.0-20251105063917-baa94431c9cb
 	github.com/pqabelian/abeutil v0.0.0-20231107022913-d6d3bf295938
 	golang.org/x/crypto v0.36.0
 	google.golang.org/protobuf v1.36.5
