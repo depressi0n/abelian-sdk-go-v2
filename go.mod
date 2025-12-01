@@ -5,7 +5,7 @@ go 1.23.2
 toolchain go1.23.4
 
 require (
-	github.com/abesuite/abec v1.0.1-0.20251125144652-5ad4cca53b42
+	github.com/abesuite/abec v1.0.1-0.20251201074439-fd330abd0274
 	github.com/jrick/logrotate v1.0.0
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/pqabelian/abelian-aip11-go v0.0.0-20251105063917-baa94431c9cb
