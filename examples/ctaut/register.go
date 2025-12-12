@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian"
@@ -41,46 +42,31 @@ func registerCTAUT() {
 	// And the plan after that would be
 	// 1. For the next mint script, Bob and Cherry will each use 1 root token.
 	// 2. For the next re-register script, Bob and Cherry also will each use 1 root token.
-	issuerTokens := make([][]byte, 0, len(issuerAbelAddresses))
+	issuerCoinAddresses := make([][]byte, 0, len(issuerAbelAddresses))
 	for _, abelAddress := range issuerAbelAddresses {
 		address, _ := abelian.NewAbelAddress(abelAddress)
-		issuerTokens = append(issuerTokens, address.GetCryptoAddress().GetCoinAddress().Data())
+		issuerCoinAddresses = append(issuerCoinAddresses, address.GetCryptoAddress().GetCoinAddress().Data())
 	}
 
-	txMemo, autWitness, err := abelian.CreateCTAUTRegisterScript(
-		abelian.AutScriptVersion,
-		[]byte("Post-Quantum USD"),
-		[]byte("PQUSD"),
-		[]byte("USD"),
-		[]byte("Cent"),
-		100,
-		[]byte("Post-Quantum USD on the world"),
-		uint64(1)<<51-1, // the maximum amount
-		issuerTokens,
-		1, // it means that bob and cherry must cooperate to mint
-		1, // it means that bob and cherry must cooperate to re-register
-		600_000,
-		uint8(len(issuerAbelAddresses)*rootTokenNum),
-		[]byte("The first registration of Post-Quantum USD on the world"),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	// set the host outpoint for each root token
 	targetAmount := int64(0)
-	txOutDescs := make([]*abelian.TxOutDesc, 0, len(issuerAbelAddresses)*rootTokenNum)
+	// Note that there are 3 types of txOutDescs
+	txOutDescsForFully := []*abelian.TxOutDesc{}
+	txOutDescsForPseudo := []*abelian.TxOutDesc{}
+	txOutDescsForPseudoCT := []*abelian.TxOutDesc{}
+	// AUT (root) tokens would be hosted on pseudoCT-privacy
+	txOutDescsForAUT := make([]*abelian.TxOutDesc, 0, len(issuerAbelAddresses)*rootTokenNum)
 	for _, abelAddress := range issuerAbelAddresses {
 		address, _ := abelian.NewAbelAddress(abelAddress)
 
 		for j := 0; j < rootTokenNum; j++ {
-			txOutDescs = append(txOutDescs, &abelian.TxOutDesc{
+			txOutDescsForAUT = append(txOutDescsForAUT, &abelian.TxOutDesc{
 				AbelAddress: address,
 				CoinValue:   1,
 			})
 			targetAmount += 1
 		}
 	}
+
 	// Load coins of specified account
 	selectAccountIDs := []int64{5}
 	availableCoins := []*database.Coin{}
@@ -168,7 +154,12 @@ func registerCTAUT() {
 	}
 
 	// Estimated fee
-	estimatedTxFee := abelian.EstimateTxFee(txInDescs, txOutDescs)
+	tmpTxOutDescs := make([]*abelian.TxOutDesc, 0, len(txOutDescsForFully)+len(txOutDescsForPseudoCT)+len(txOutDescsForPseudo)+len(txOutDescsForAUT))
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForFully...)
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForPseudoCT...)
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForAUT...)
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForPseudo...)
+	estimatedTxFee := abelian.EstimateTxFee(txInDescs, tmpTxOutDescs)
 
 	// change if needed
 	if selectAmount-targetAmount-estimatedTxFee > 0 {
@@ -180,14 +171,44 @@ func registerCTAUT() {
 			panic("change address with unmatched network id")
 		}
 
-		txOutDescs = append(txOutDescs, &abelian.TxOutDesc{
+		// with above configuration, the change will be a pseudoCT-privacy output
+		txOutDescsForPseudoCT = append(txOutDescsForPseudoCT, &abelian.TxOutDesc{
 			AbelAddress: changeAbelAddress,
 			CoinValue:   selectAmount - targetAmount - estimatedTxFee,
 		})
 	}
 
-	// [IMPORTANT] sort txOutDescs
+	txOutDescs := make([]*abelian.TxOutDesc, 0, len(txOutDescsForFully)+len(txOutDescsForPseudoCT)+len(txOutDescsForPseudo))
+	txOutDescs = append(txOutDescs, txOutDescsForFully...)
+	txOutDescs = append(txOutDescs, txOutDescsForPseudoCT...)
+	txOutDescs = append(txOutDescs, txOutDescsForPseudo...)
+	// [IMPORTANT] sort txOutDescs, note that the order should be
+	// 1. fully-privacy / 2. pseudoCT-privacy / 3. pseudo-privacy
+	// 2. the inner order would be kept while sorting
 	err = abelian.SortTxOutDesc(txOutDescs)
+	if err != nil {
+		panic(err)
+	}
+
+	// Then find the index for txOutDescsForAUT
+	txOutDescs = slices.Insert(txOutDescs, len(txOutDescsForFully), txOutDescsForAUT...)
+	outStartIndex := uint8(len(txOutDescsForFully))
+
+	// choose the privacy type
+	// 0 - unlimited, 1 - limited public, 2 - limited hidden
+	privacyType := abelian.AutPrivacyTypeLimitedHidden
+
+	txMemo, autWitness, err := abelian.CreateCTAUTRegisterScript(
+		abelian.AutScriptVersion,
+		[]byte("Post-Quantum USD"), []byte("PQUSD"), []byte("USD"), []byte("Cent"), 100,
+		[]byte("Post-Quantum USD on the world"), uint64(1)<<51-1, // the maximum amount
+		issuerCoinAddresses, 600_000,
+		1, // it means that bob and cherry must cooperate to re-register
+		1, // it means that bob and cherry must cooperate to mint
+		privacyType,
+		outStartIndex, uint8(len(txOutDescsForAUT)),
+		[]byte("The first registration of Post-Quantum USD on the world"),
+	)
 	if err != nil {
 		panic(err)
 	}

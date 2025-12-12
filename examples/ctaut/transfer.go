@@ -3,14 +3,22 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian"
+	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/common"
 	"github.com/pqabelian/abelian-sdk-go-v2/examples/database"
 )
 
 func transferCTAUT(identifier abelian.AutId) {
+	// here get aut medata for privacy type
+	metadata, err := database.LoadCTAUTMetadata(identifier.String())
+	if err != nil {
+		panic(err)
+	}
+
 	pseudonymCTAccount, err := database.LoadAccountByID(5)
 	if err != nil {
 		panic("fail to load account with id 5")
@@ -30,22 +38,48 @@ func transferCTAUT(identifier abelian.AutId) {
 		panic("fail to generated change address for account")
 	}
 
-	receiverAddresses := [][]byte{
+	// Note that the order is important, it must keep consistent with the order in recipients
+	tmpAddresses := [][]byte{
 		haloAbelAddress,
 		innaAbelAddress,
 	}
 	recipientValues := []uint64{2000, 500}
 
 	targetTokenValue := uint64(0)
-	recipients := make([]*abelian.Recipient, 0, len(receiverAddresses))
-	for i := 0; i < len(receiverAddresses); i++ {
-		abelAddress, _ := abelian.NewAbelAddress(receiverAddresses[i])
+	// [IMPORTANT] sort the CT-AUT tokens: CT-Token > Plain Token
+	// For simplicity, we make it already for output
+	recipients := make([]*abelian.Recipient, 0, len(tmpAddresses))
+	// Note that the order is important, it must keep consistent with the order in recipients
+	receiverAddresses := make([][]byte, 0, len(tmpAddresses))
+	for i := 0; i < len(tmpAddresses); i++ {
+		abelAddress, _ := abelian.NewAbelAddress(tmpAddresses[i])
 
-		recipients = append(recipients, &abelian.Recipient{
+		recipient := &abelian.Recipient{
 			CryptoAddress: *abelAddress.GetCryptoAddress(),
 			Value:         recipientValues[i],
-			HideValue:     true,
-		})
+			HideValue:     false,
+		}
+
+		if metadata.PrivacyType == abelian.AutPrivacyTypeUnlimited {
+			// unlimited privacy type, all recipients are public / hidden
+		} else if metadata.PrivacyType == abelian.AutPrivacyTypeLimitedPublic {
+			recipient.HideValue = false
+		} else if metadata.PrivacyType == abelian.AutPrivacyTypeLimitedHidden {
+			recipient.HideValue = true
+		} else {
+			panic("unsupported privacy type")
+		}
+
+		if recipient.HideValue {
+			// prepend
+			recipients = slices.Insert(recipients, 0, recipient)
+			receiverAddresses = slices.Insert(receiverAddresses, 0, tmpAddresses[i])
+		} else {
+			// append
+			recipients = append(recipients, recipient)
+			receiverAddresses = append(receiverAddresses, tmpAddresses[i])
+		}
+
 		targetTokenValue += recipientValues[i]
 	}
 
@@ -72,34 +106,45 @@ func transferCTAUT(identifier abelian.AutId) {
 	if selectedValue-targetTokenValue != 0 {
 		change, _ := abelian.NewAbelAddress(changeAddress)
 
-		receiverAddresses = append(receiverAddresses, changeAddress)
-		recipients = append(recipients, &abelian.Recipient{
+		recipient := &abelian.Recipient{
 			CryptoAddress: *change.GetCryptoAddress(),
 			Value:         selectedValue - targetTokenValue,
 			HideValue:     false,
-		})
+		}
+		if metadata.PrivacyType == abelian.AutPrivacyTypeUnlimited {
+			// unlimited privacy type, all recipients are public / hidden
+		} else if metadata.PrivacyType == abelian.AutPrivacyTypeLimitedPublic {
+			recipient.HideValue = false
+		} else if metadata.PrivacyType == abelian.AutPrivacyTypeLimitedHidden {
+			recipient.HideValue = true
+		} else {
+			panic("unsupported privacy type")
+		}
+
+		if recipient.HideValue {
+			// prepend
+			recipients = slices.Insert(recipients, 0, recipient)
+			receiverAddresses = slices.Insert(receiverAddresses, 0, changeAddress)
+		} else {
+			// append
+			recipients = append(recipients, recipient)
+			receiverAddresses = append(receiverAddresses, changeAddress)
+		}
 	}
 
 	// [IMPORTANT] sort the CT-AUT input/output tokens: CT-Token > Plain Token
 	// For simplicity, we make it already for output
 	sort.SliceStable(selectedTokens, func(i, j int) bool {
-		if selectedTokens[i].TokenType == selectedTokens[j].TokenType {
-			return false
-		}
-
-		if selectedTokens[i].TokenType == 0 { // hidden
+		if selectedTokens[i].TokenType == uint8(crypto.AutTokenTypeHidden) &&
+			selectedTokens[j].TokenType == uint8(crypto.AutTokenTypePublic) {
 			return true
 		}
-		if selectedTokens[j].TokenType == 0 { // hidden
-			return false
-		}
-
 		return false
 	})
 
-	consumedTokens := make([]*abelian.InputTokenDesc, len(selectedTokens))
+	autInputDescs := make([]*abelian.InputTokenDesc, len(selectedTokens))
 	for i, token := range selectedTokens {
-		consumedTokens[i] = abelian.NewInputTokenDesc(
+		autInputDescs[i] = abelian.NewInputTokenDesc(
 			token.Version,
 			token.ValueScript,
 			token.CryptoValuePK,
@@ -108,25 +153,17 @@ func transferCTAUT(identifier abelian.AutId) {
 		)
 	}
 
-	txMemo, autWitness, err := abelian.CreateCTAUTTransferScript(
-		abelian.AutScriptVersion,
-		identifier,
-		consumedTokens,
-		recipients,
-		[]byte("first transfer to for halo and inna"),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	// Abelian Layer
-
 	// set the host outpoint for each root token
 	targetAmount := int64(0)
-	txOutDescs := make([]*abelian.TxOutDesc, 0, len(receiverAddresses))
+	// Note that there are 3 types of txOutDescs
+	txOutDescsForFully := []*abelian.TxOutDesc{}
+	txOutDescsForPseudo := []*abelian.TxOutDesc{}
+	txOutDescsForPseudoCT := []*abelian.TxOutDesc{}
+	// AUT tokens would be hosted on pseudoCT-privacy
+	txOutDescsForAUT := make([]*abelian.TxOutDesc, 0, len(receiverAddresses))
 	for _, abelAddress := range receiverAddresses {
 		address, _ := abelian.NewAbelAddress(abelAddress)
-		txOutDescs = append(txOutDescs, &abelian.TxOutDesc{
+		txOutDescsForAUT = append(txOutDescsForAUT, &abelian.TxOutDesc{
 			AbelAddress: address,
 			CoinValue:   1,
 		})
@@ -134,16 +171,17 @@ func transferCTAUT(identifier abelian.AutId) {
 	}
 
 	selectAmount := int64(0)
-	selectedCoins := []*database.Coin{}
+	selectedCoinsForAUT := []*database.Coin{}
 	// load coins for selected CT-AUT tokens
 	for _, token := range selectedTokens {
 		coin, err := database.LoadCoinByPoint(token.AccountID, token.TxID, token.Index)
 		if err != nil {
 			panic(err)
 		}
-		selectedCoins = append(selectedCoins, coin)
+		selectedCoinsForAUT = append(selectedCoinsForAUT, coin)
 		selectAmount += coin.Value
 	}
+
 	// provide transaction fee from Abelian Coins
 	availableCoins := []*database.Coin{}
 	for _, accountID := range selectAccountIDs {
@@ -153,6 +191,7 @@ func transferCTAUT(identifier abelian.AutId) {
 		}
 
 		for _, coin := range coins {
+			// skip the special value to avoid unconscious destruction
 			if coin.Value == 1 {
 				continue
 			}
@@ -170,6 +209,7 @@ func transferCTAUT(identifier abelian.AutId) {
 		return availableCoins[i].Value > availableCoins[j].Value
 	})
 
+	selectedCoinsForABEL := []*database.Coin{}
 	for i := 0; i < len(availableCoins); i++ {
 		// skip the special value
 		if availableCoins[i].Value == 1 {
@@ -179,7 +219,7 @@ func transferCTAUT(identifier abelian.AutId) {
 			break
 		}
 
-		selectedCoins = append(selectedCoins, availableCoins[i])
+		selectedCoinsForABEL = append(selectedCoinsForABEL, availableCoins[i])
 		selectAmount += availableCoins[i].Value
 	}
 	if selectAmount < targetAmount {
@@ -187,9 +227,9 @@ func transferCTAUT(identifier abelian.AutId) {
 	}
 
 	// Build TxInDesc with selectedCoins
-	txInDescs := []*abelian.TxInDescWithRing{}
+	txInDescsForAUT := []*abelian.TxInDescWithRing{}
 	coin2AccountID := map[string]int64{}
-	for _, coin := range selectedCoins {
+	for _, coin := range selectedCoinsForAUT {
 		ring, err := database.LoadRing(coin.RingID)
 		if err != nil {
 			panic(err)
@@ -216,16 +256,80 @@ func transferCTAUT(identifier abelian.AutId) {
 			TxoRing:     ringDetail,
 		}
 
-		fmt.Printf("%#+v", txIndesc)
-		txInDescs = append(txInDescs, txIndesc)
+		//fmt.Printf("%#+v", txIndesc)
+		txInDescsForAUT = append(txInDescsForAUT, txIndesc)
+		coin2AccountID[coin.Coin.ID().String()] = coin.AccountID
+	}
+
+	// Build TxInDesc
+	txInDescsForFully := []*abelian.TxInDescWithRing{}
+	txInDescsForPseudoCT := []*abelian.TxInDescWithRing{}
+	txInDescsForPseudo := []*abelian.TxInDescWithRing{}
+	for _, coin := range selectedCoinsForABEL {
+		ring, err := database.LoadRing(coin.RingID)
+		if err != nil {
+			panic(err)
+		}
+		coinIDs := make([]*abelian.CoinID, len(ring.Coins))
+		serializedTxOuts := make([][]byte, len(ring.Coins))
+		for i := 0; i < len(ring.Coins); i++ {
+			coinIDs[i] = ring.Coins[i].ID()
+			serializedTxOuts[i] = ring.Coins[i].TxVoutData
+		}
+		ringDetail, err := abelian.NewCoinRing(ring.RingVersion, ring.RingHeight, ring.RingBlockIDs, coinIDs, serializedTxOuts, ring.IsCoinbase)
+		if err != nil {
+			panic(err)
+		}
+
+		txIndesc := &abelian.TxInDescWithRing{
+			BlockHeight: coin.BlockHeight,
+			BlockID:     coin.BlockHash,
+			TxVersion:   coin.TxVersion,
+			TxID:        coin.TxID,
+			TxOutIndex:  coin.Index,
+			TxOutData:   coin.TxVoutData,
+			CoinValue:   coin.Value,
+			TxoRing:     ringDetail,
+		}
+
+		// get the privacy level of the coin
+		coinAddress, err := crypto.DecodeCoinAddressFromSerializedTxOutData(coin.TxVersion, coin.TxVoutData)
+		if err != nil {
+			panic(err)
+		}
+		privacyLevel := coinAddress.PrivacyLevel()
+
+		switch privacyLevel {
+		case crypto.PrivacyLevelFullPrivacyPre, crypto.PrivacyLevelFullPrivacyRand:
+			txInDescsForFully = append(txInDescsForFully, txIndesc)
+			break
+		case crypto.PrivacyLevelPseudonymCT:
+			txInDescsForPseudoCT = append(txInDescsForPseudoCT, txIndesc)
+			break
+		case crypto.PrivacyLevelPseudonym:
+			txInDescsForPseudo = append(txInDescsForPseudo, txIndesc)
+			break
+		default:
+			panic(fmt.Errorf("unsupported privacy level %d", privacyLevel))
+		}
+
+		//fmt.Printf("%#+v", txIndesc)
 		coin2AccountID[coin.Coin.ID().String()] = coin.AccountID
 	}
 
 	// [IMPORTANT] Sort TxInDesc
+	txInDescs := make([]*abelian.TxInDescWithRing, 0, len(txInDescsForFully)+len(txInDescsForPseudoCT)+len(txInDescsForPseudo))
+	txInDescs = append(txInDescs, txInDescsForFully...)
+	txInDescs = append(txInDescs, txInDescsForPseudoCT...)
+	txInDescs = append(txInDescs, txInDescsForPseudo...)
 	err = abelian.SortTxInDescWithRing(txInDescs)
 	if err != nil {
 		panic(err)
 	}
+
+	// Then find the index for txOutDescsForAUT
+	inStartIndex := uint8(len(txInDescsForFully))
+	txInDescs = slices.Insert(txInDescs, len(txInDescsForFully), txInDescsForAUT...)
 
 	// set sender account ID for signing
 	senderAccountIDs := make([]int64, 0, len(txInDescs))
@@ -234,7 +338,12 @@ func transferCTAUT(identifier abelian.AutId) {
 	}
 
 	// Estimated fee
-	estimatedTxFee := abelian.EstimateTxFee(txInDescs, txOutDescs)
+	tmpTxOutDescs := make([]*abelian.TxOutDesc, 0, len(txOutDescsForFully)+len(txOutDescsForPseudoCT)+len(txOutDescsForPseudo)+len(txOutDescsForAUT))
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForFully...)
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForPseudoCT...)
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForAUT...)
+	tmpTxOutDescs = append(tmpTxOutDescs, txOutDescsForPseudo...)
+	estimatedTxFee := abelian.EstimateTxFee(txInDescs, tmpTxOutDescs)
 
 	// change if needed
 	if selectAmount-targetAmount-estimatedTxFee > 0 {
@@ -246,14 +355,37 @@ func transferCTAUT(identifier abelian.AutId) {
 			panic("change address with unmatched network id")
 		}
 
-		txOutDescs = append(txOutDescs, &abelian.TxOutDesc{
+		// with above configuration, the change will be a pseudoCT-privacy output
+		txOutDescsForPseudoCT = append(txOutDescsForPseudoCT, &abelian.TxOutDesc{
 			AbelAddress: changeAbelAddress,
 			CoinValue:   selectAmount - targetAmount - estimatedTxFee,
 		})
 	}
 
 	// [IMPORTANT] sort txOutDescs
+	txOutDescs := make([]*abelian.TxOutDesc, 0, len(txOutDescsForFully)+len(txOutDescsForPseudoCT)+len(txOutDescsForPseudo))
+	txOutDescs = append(txOutDescs, txOutDescsForFully...)
+	txOutDescs = append(txOutDescs, txOutDescsForPseudoCT...)
+	txOutDescs = append(txOutDescs, txOutDescsForPseudo...)
+	// [IMPORTANT] sort txOutDescs, note that the order should be
+	// 1. fully-privacy / 2. pseudoCT-privacy / 3. pseudo-privacy
+	// 2. the inner order would be kept while sorting
 	err = abelian.SortTxOutDesc(txOutDescs)
+	if err != nil {
+		panic(err)
+	}
+
+	// Find the outStartIndex for txOutDescsForAUT
+	outStartIndex := uint8(len(txOutDescsForFully))
+	txOutDescs = slices.Insert(txOutDescs, len(txOutDescsForFully), txOutDescsForAUT...)
+
+	txMemo, autWitness, err := abelian.CreateCTAUTTransferScript(
+		abelian.AutScriptVersion,
+		identifier,
+		inStartIndex, autInputDescs,
+		outStartIndex, recipients,
+		[]byte("first transfer to for halo and inna"),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -289,7 +421,13 @@ func transferCTAUT(identifier abelian.AutId) {
 		panic(err)
 	}
 	// mark coin spent
-	for _, coin := range selectedCoins {
+	for _, coin := range selectedCoinsForAUT {
+		err = database.SpendCoin(coin.ID)
+		if err != nil {
+			panic(fmt.Errorf("fail to mark coin spent: %v", err))
+		}
+	}
+	for _, coin := range selectedCoinsForABEL {
 		err = database.SpendCoin(coin.ID)
 		if err != nil {
 			panic(fmt.Errorf("fail to mark coin spent: %v", err))

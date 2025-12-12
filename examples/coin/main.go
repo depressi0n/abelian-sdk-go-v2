@@ -22,69 +22,74 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 		serializedTxOuts[index] = txOutData
 	}
 
-	txMemo, err := hex.DecodeString(tx.Memo)
+	serializedTx, err := hex.DecodeString(tx.Hex)
 	if err != nil {
 		return err
 	}
-	ctautScript, err := abelian.ParseCTAUTScript(tx.Version, tx.TxID, txMemo)
+	extAutScript, err := abelian.ExtractAutScriptFromHostTx(serializedTx)
 	if err != nil {
 		return err
 	}
-	var tokens []*abelian.CTAUTToken
-	if ctautScript != nil {
-		tokens, err = abelian.GetGeneratedCTAUTTokens(ctautScript, tx.Version, tx.TxHash, serializedTxOuts)
+	var generatedTokens []*abelian.CTAUTToken
+	if extAutScript != nil {
+		generatedTokens, err = abelian.GetGeneratedCTAUTTokens(extAutScript)
 		if err != nil {
 			return err
 		}
 
-		switch ctautScript.Type() {
+		switch extAutScript.Type() {
 		case abelian.CTAUTTypeRegistration:
-			instance, err := abelian.RegisteredCTAUTMetadata(ctautScript, tx.Version, tx.TxHash, serializedTxOuts)
+			metadata, err := abelian.RegisteredCTAUTMetadata(extAutScript)
 			if err != nil {
 				return err
 			}
-			fmt.Println("Register CT-AUT instance: ", ctautScript.AutIdentifier())
-			fmt.Println("\t Name: ", instance.CTAutName)
-			fmt.Println("\t Symbol: ", instance.CTAutSymbol)
-			fmt.Println("\t Base Unit Name: ", instance.BaseUnitName)
-			fmt.Println("\t Sub Unit Name: ", instance.SubUnitName)
-			fmt.Println("\t Unit Scale: ", instance.UnitScale)
-			fmt.Println("\t Memo: ", instance.CTAutMemo)
+			fmt.Println("Register CT-AUT instance: ")
+			fmt.Println("\t Version: ", metadata.Version)
+			fmt.Println("\t Identifier: ", metadata.AutIdentifier)
+			fmt.Println("\t Name: ", metadata.AutName)
+			fmt.Println("\t Symbol: ", metadata.AutSymbol)
+			fmt.Println("\t Base Unit Name: ", metadata.BaseUnitName)
+			fmt.Println("\t Sub Unit Name: ", metadata.SubUnitName)
+			fmt.Println("\t Unit Scale: ", metadata.UnitScale)
+			fmt.Println("\t Memo: ", metadata.AutMemo)
 
-			fmt.Printf("\t %d Issuer Tokens: \n", len(instance.Issuers))
-			for i := 0; i < len(instance.Issuers); i++ {
-				fmt.Println("\t\t", instance.Issuers[i])
+			fmt.Println("\t Planned Total Supply: ", metadata.PlannedTotalSupply)
+			fmt.Printf("\t %d Issuers: \n", len(metadata.Issuers))
+			for i := 0; i < len(metadata.Issuers); i++ {
+				fmt.Println("\t\t", metadata.Issuers[i])
+			}
+			fmt.Println("\t Privacy Type: ", metadata.PrivacyType)
+			fmt.Println("\t Re-Registration Expire Height: ", metadata.ReregistrationExpireHeight)
+			fmt.Println("\t Re-Registration Threshold: ", metadata.ReregistrationThreshold)
+			fmt.Println("\t Mint Threshold: ", metadata.MintThreshold)
+
+			fmt.Printf("\t %d Root Tokens: \n", len(generatedTokens))
+			for i := 0; i < len(generatedTokens); i++ {
+				fmt.Printf("\t\t (%s,%d)\n", generatedTokens[i].HostOutpoint.TxHash, generatedTokens[i].HostOutpoint.Index)
 			}
 
-			fmt.Printf("\t %d Tokens: \n", len(tokens))
-			for i := 0; i < len(tokens); i++ {
-				fmt.Printf("\t\t (%s,%d)\n", tokens[i].HostOutpoint.TxHash, tokens[i].HostOutpoint.Index)
-			}
+			fmt.Println("\t Update Script Versions: ", metadata.UpdateScriptVersions)
 
-			fmt.Println("\t Planned Total Supply: ", instance.PlannedTotalSupply)
-			fmt.Println("\t Mint Threshold: ", instance.MintThreshold)
-			fmt.Println("\t Re-Registration Threshold: ", instance.ReregistrationThreshold)
-			fmt.Println("\t Expire Height: ", instance.ReregistrationExpireHeight)
-
-			metadata := &database.Metadata{
-				RegisteredTxID:          tx.TxID,
-				Version:                 instance.Version,
-				Identifier:              instance.CTAutIdentifier[:],
-				Name:                    instance.CTAutName,
-				Symbol:                  instance.CTAutSymbol,
-				BaseUnitName:            instance.BaseUnitName,
-				SubUnitName:             instance.SubUnitName,
-				UnitScale:               instance.UnitScale,
-				Memo:                    instance.CTAutMemo,
-				PlannedTotalAmount:      instance.PlannedTotalSupply,
-				Issuers:                 strings.Join(instance.Issuers, ";"),
-				MintThreshold:           instance.MintThreshold,
-				ReregistrationThreshold: instance.ReregistrationThreshold,
-				ExpireHeight:            instance.ReregistrationExpireHeight,
-				MintedAmount:            0,
-				BurnedAmount:            0,
+			dbMetadata := &database.Metadata{
+				RegisteredTxID:             tx.TxID,
+				Version:                    metadata.Version,
+				Identifier:                 metadata.AutIdentifier.String(),
+				Name:                       metadata.AutName,
+				Symbol:                     metadata.AutSymbol,
+				BaseUnitName:               metadata.BaseUnitName,
+				SubUnitName:                metadata.SubUnitName,
+				UnitScale:                  metadata.UnitScale,
+				Memo:                       metadata.AutMemo,
+				PlannedTotalAmount:         metadata.PlannedTotalSupply,
+				Issuers:                    strings.Join(metadata.Issuers, ";"),
+				ReregistrationExpireHeight: metadata.ReregistrationExpireHeight,
+				ReregistrationThreshold:    metadata.ReregistrationThreshold,
+				MintThreshold:              metadata.MintThreshold,
+				MintedAmount:               0,
+				BurnedAmount:               0,
+				UpdateScriptVersions:       metadata.UpdateScriptVersions,
 			}
-			_, err = database.InsertCTAUTInstance(metadata)
+			_, err = database.InsertCTAUTInstance(dbMetadata)
 			if err != nil {
 				return err
 			}
@@ -96,43 +101,66 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 			fallthrough
 		case abelian.CTAUTTypeBurn:
 			// get instance from database
-			identifier := ctautScript.AutIdentifier()
+			identifier := extAutScript.AutIdentifier()
 			metadata, err := database.LoadCTAUTMetadata(identifier.String())
 			if err != nil {
 				fmt.Errorf("fail to load CT-AUT instance: %v", err)
 				return err
 			}
+			if metadata == nil {
+				return fmt.Errorf("no such CT-AUT instance found")
+			}
+			activeRootTokens, err := database.LoadActiveRootTokens(identifier.String())
+			if err != nil {
+				return err
+			}
+
+			activeRootTokenSet := make(map[abelian.OutPoint]struct{})
+			for _, token := range activeRootTokens {
+				activeRootTokenSet[abelian.OutPoint{
+					TxHash: token.TxID,
+					Index:  token.Index,
+				}] = struct{}{}
+			}
 
 			ctAUTMetadata := &abelian.CTAUTMetadata{
 				Version:                    metadata.Version,
-				CTAutIdentifier:            identifier.String(),
-				CTAutName:                  metadata.Name,
-				CTAutSymbol:                metadata.Symbol,
+				AutIdentifier:              identifier,
+				AutName:                    metadata.Name,
+				AutSymbol:                  metadata.Symbol,
 				BaseUnitName:               metadata.BaseUnitName,
 				SubUnitName:                metadata.SubUnitName,
 				UnitScale:                  metadata.UnitScale,
-				CTAutMemo:                  metadata.Memo,
+				AutMemo:                    metadata.Memo,
 				PlannedTotalSupply:         metadata.PlannedTotalAmount,
 				Issuers:                    strings.Split(metadata.Issuers, ";"),
-				MintThreshold:              metadata.MintThreshold,
+				ReregistrationExpireHeight: metadata.ReregistrationExpireHeight,
 				ReregistrationThreshold:    metadata.ReregistrationThreshold,
-				ReregistrationExpireHeight: metadata.ExpireHeight,
+				MintThreshold:              metadata.MintThreshold,
+				PrivacyType:                metadata.PrivacyType,
 				MintedAmount:               metadata.MintedAmount,
 				BurnedAmount:               metadata.BurnedAmount,
+				ActiveRootTokenSet:         activeRootTokenSet,
+				UpdateScriptVersions:       metadata.UpdateScriptVersions,
 			}
-			ctAUTMetadata, err = abelian.UpdateMetadataFromCTAUTScript(ctautScript, tx.Version, tx.TxHash, serializedTxOuts, ctAUTMetadata)
+			updatedAUTMetadata, err := abelian.UpdateMetadataFromCTAUTScript(extAutScript, ctAUTMetadata)
 			if err != nil {
 				fmt.Errorf("fail to update instance: %s", err)
 				return err
 			}
-			metadata.Memo = ctAUTMetadata.CTAutMemo
-			metadata.PlannedTotalAmount = ctAUTMetadata.PlannedTotalSupply
-			metadata.Issuers = strings.Join(ctAUTMetadata.Issuers, ";")
-			metadata.MintThreshold = ctAUTMetadata.MintThreshold
-			metadata.ReregistrationThreshold = ctAUTMetadata.ReregistrationThreshold
-			metadata.ExpireHeight = ctAUTMetadata.ReregistrationExpireHeight
-			metadata.MintedAmount = ctAUTMetadata.MintedAmount
-			metadata.BurnedAmount = ctAUTMetadata.BurnedAmount
+
+			metadata.Version = updatedAUTMetadata.Version
+			metadata.Memo = updatedAUTMetadata.AutMemo
+			metadata.PlannedTotalAmount = updatedAUTMetadata.PlannedTotalSupply
+			metadata.Issuers = strings.Join(updatedAUTMetadata.Issuers, ";")
+			metadata.PrivacyType = uint8(updatedAUTMetadata.PrivacyType)
+			metadata.ReregistrationExpireHeight = updatedAUTMetadata.ReregistrationExpireHeight
+			metadata.ReregistrationThreshold = updatedAUTMetadata.ReregistrationThreshold
+			metadata.MintThreshold = updatedAUTMetadata.MintThreshold
+
+			metadata.MintedAmount = updatedAUTMetadata.MintedAmount
+			metadata.BurnedAmount = updatedAUTMetadata.BurnedAmount
+			metadata.UpdateScriptVersions = updatedAUTMetadata.UpdateScriptVersions
 
 			// update instance to database
 			err = database.UpdateCTAUTMetadata(metadata)
@@ -140,30 +168,33 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 				return err
 			}
 
-			fmt.Println("Register CT-AUT instance: ", ctautScript.AutIdentifier())
-			fmt.Println("\t Name: ", metadata.Name)
-			fmt.Println("\t Symbol: ", metadata.Symbol)
-			fmt.Println("\t Base Unit Name: ", metadata.BaseUnitName)
-			fmt.Println("\t Sub Unit Name: ", metadata.SubUnitName)
-			fmt.Println("\t Unit Scale: ", metadata.UnitScale)
-			fmt.Println("\t Memo: ", metadata.Memo)
+			fmt.Println("Updated CT-AUT metadata:")
+			fmt.Printf("\t Identifier : %v -> %v \n", ctAUTMetadata.AutIdentifier, metadata.Identifier)
+			fmt.Printf("\t Version : %v -> %v  \n", ctAUTMetadata.Version, metadata.Version)
+			fmt.Printf("\t Memo : %v -> %v \n", ctAUTMetadata.AutMemo, metadata.Memo)
 
-			fmt.Printf("\t %d Issuer Tokens: \n", metadata.Issuers)
-			//for i := 0; i < len(metadata.Issuers); i++ {
-			//	fmt.Println("\t\t", metadata.Issuers[i])
-			//}
+			issuers := strings.Split(metadata.Issuers, ";")
+			fmt.Printf("\t %d Issuers: \n", len(issuers))
+			for i := 0; i < len(issuers); i++ {
+				fmt.Printf("\t\t %s \n", issuers[i])
+			}
 
-			fmt.Printf("\t %d Tokens: \n", len(tokens))
-			for i := 0; i < len(tokens); i++ {
-				fmt.Printf("\t\t (%s,%d)\n", tokens[i].HostOutpoint.TxHash, tokens[i].HostOutpoint.Index)
+			fmt.Printf("\t %d Tokens: \n", len(generatedTokens))
+			for i := 0; i < len(generatedTokens); i++ {
+				fmt.Printf("\t\t (%s,%d)\n", generatedTokens[i].HostOutpoint.TxHash, generatedTokens[i].HostOutpoint.Index)
 			}
 
 			fmt.Println("\t Planned Total Supply: ", metadata.PlannedTotalAmount)
-			fmt.Println("\t Mint Threshold: ", metadata.MintThreshold)
+			fmt.Println("\t Privacy Type: ", metadata.PrivacyType)
+			fmt.Println("\t Re-Registration Height: ", metadata.ReregistrationExpireHeight)
 			fmt.Println("\t Re-Registration Threshold: ", metadata.ReregistrationThreshold)
-			fmt.Println("\t Expire Height: ", metadata.ExpireHeight)
+			fmt.Println("\t Mint Threshold: ", metadata.MintThreshold)
+
+			fmt.Println("\t Minted Amount: ", metadata.MintedAmount)
+			fmt.Println("\t Burned Amount: ", metadata.BurnedAmount)
+			fmt.Println("\t Update Script Versions: ", metadata.UpdateScriptVersions)
 		default:
-			return fmt.Errorf("unsupported CT-AUT script type: %d", ctautScript.Type())
+			return fmt.Errorf("unsupported CT-AUT script type: %d", extAutScript.Type())
 		}
 	}
 
@@ -190,24 +221,21 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 				return fmt.Errorf("fail to store coin into database: %v", err)
 			}
 
-			if ctautScript != nil {
-				identifier := ctautScript.AutIdentifier()
-				version := ctautScript.Version()
-				isRootToken := ctautScript.Type() == abelian.CTAUTTypeRegistration || ctautScript.Type() == abelian.CTAUTTypeReRegistration
-				tokenIndex := 0
-				for ; tokenIndex < len(tokens); tokenIndex++ {
-					if tokens[tokenIndex].HostOutpoint.Index == uint8(index) {
+			if extAutScript != nil {
+				identifier := extAutScript.AutIdentifier()
+				isRootToken := extAutScript.Type() == abelian.CTAUTTypeRegistration || extAutScript.Type() == abelian.CTAUTTypeReRegistration
+
+				var token *abelian.CTAUTToken
+				for i := 0; i < len(generatedTokens); i++ {
+					if generatedTokens[i].HostOutpoint.Index == uint8(index) {
+						token = generatedTokens[i]
 						break
 					}
 				}
-				if tokenIndex == len(tokens) {
-					continue
-				}
-				ctAUTToken := tokens[tokenIndex]
 
-				if ctAUTToken != nil {
+				if token != nil {
 					success, ctAutValue, tokenType, cryptoValuePK, cryptoValueSK, err := viewAccount.ReceiveCTAUTToken(
-						version, ctautScript.Type(), ctAUTToken.ValueScript,
+						extAutScript.Version(), extAutScript.Type(), token.ValueScript,
 						tx.Version, txOutData)
 					if err != nil {
 						return fmt.Errorf("fail to get the amount of CT-AUT token: %v", err)
@@ -217,8 +245,10 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 					}
 
 					// note that the last token would be marked burned
-					if ctautScript.Type() == abelian.CTAUTTypeBurn && tokenIndex == len(tokens)-1 {
-						continue
+					if extAutScript.Type() == abelian.CTAUTTypeBurn {
+						if token.HostOutpoint.Index == generatedTokens[len(generatedTokens)-1].HostOutpoint.Index {
+							continue
+						}
 					}
 
 					if isRootToken {
@@ -232,9 +262,9 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 					_, err = database.InsertToken(viewAccount.ID, identifier.String(),
 						tx.TxID, uint8(index),
 						isRootToken, uint8(tokenType),
-						ctAUTToken.ValueScript,
+						token.ValueScript,
 						cryptoValuePK, cryptoValueSK,
-						int64(ctAutValue), version)
+						int64(ctAutValue), extAutScript.Version())
 					if err != nil {
 						return fmt.Errorf("fail to store coin into database: %v", err)
 					}
@@ -242,8 +272,8 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 			}
 		}
 	}
-	if ctautScript != nil && ctautScript.Type() == abelian.CTAUTTypeReRegistration {
-		identifier := ctautScript.AutIdentifier()
+	if extAutScript != nil && extAutScript.Type() == abelian.CTAUTTypeReRegistration {
+		identifier := extAutScript.AutIdentifier()
 		for _, viewAccount := range viewAccounts {
 			// disable all other root tokens of the same CT-AUT
 			disabledTokens, err := database.DisableRootToken(viewAccount.ID, identifier.String(), tx.TxID)

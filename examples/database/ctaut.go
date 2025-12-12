@@ -1,5 +1,10 @@
 package database
 
+import (
+	"strconv"
+	"strings"
+)
+
 type Metadata struct {
 	ID             int64
 	RegisteredTxID string
@@ -12,14 +17,17 @@ type Metadata struct {
 	UnitScale      uint64
 	Memo           string
 
-	PlannedTotalAmount      uint64
-	Issuers                 string
-	MintThreshold           uint8
-	ReregistrationThreshold uint8
-	ExpireHeight            int32
+	PlannedTotalAmount         uint64
+	Issuers                    string
+	PrivacyType                uint8
+	MintThreshold              uint8
+	ReregistrationThreshold    uint8
+	ReregistrationExpireHeight int32
 
 	MintedAmount uint64
 	BurnedAmount uint64
+
+	UpdateScriptVersions []uint32
 }
 
 func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
@@ -38,11 +46,16 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 		return id, err
 	}
 
-	stmt, err := db.Prepare(`INSERT INTO metadata (registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount) 
-									VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := db.Prepare(`INSERT INTO metadata (registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,privacy_type,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount,update_script_versions) 
+									VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return -1, err
 	}
+	updateScriptVersions := make([]string, len(metadata.UpdateScriptVersions))
+	for i := 0; i < len(metadata.UpdateScriptVersions); i++ {
+		updateScriptVersions[i] = strconv.Itoa(int(metadata.UpdateScriptVersions[i]))
+	}
+	updateScriptVersionsStr := strings.Join(updateScriptVersions, ",")
 	result, err := stmt.Exec(
 		metadata.RegisteredTxID,
 		metadata.Version,
@@ -55,11 +68,13 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 		metadata.Memo,
 		metadata.PlannedTotalAmount,
 		metadata.Issuers,
+		metadata.PrivacyType,
 		metadata.MintThreshold,
 		metadata.ReregistrationThreshold,
-		metadata.ExpireHeight,
+		metadata.ReregistrationExpireHeight,
 		metadata.MintedAmount,
 		metadata.BurnedAmount,
+		updateScriptVersionsStr,
 	)
 	if err != nil {
 		return -1, err
@@ -67,7 +82,7 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 	return result.LastInsertId()
 }
 func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
-	rows, err := db.Query(`SELECT id,registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount
+	rows, err := db.Query(`SELECT id,registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,privacy_type,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount,update_script_versions
 								 FROM metadata  
 								WHERE identifier = ?`, identifier)
 	if err != nil {
@@ -89,11 +104,13 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 		var memo string
 		var plannedTotalAmount uint64
 		var issuerTokens string
+		var privacyType uint8
 		var mintThreshold uint8
 		var reregistrationThreshold uint8
-		var expireHeight int32
+		var reRegistrationExpireHeight int32
 		var mintedAmount uint64
 		var burnedAmount uint64
+		var updatedScriptVersionsStr string
 
 		err = rows.Scan(
 			&id,
@@ -108,11 +125,13 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 			&memo,
 			&plannedTotalAmount,
 			&issuerTokens,
+			&privacyType,
 			&mintThreshold,
 			&reregistrationThreshold,
-			&expireHeight,
+			&reRegistrationExpireHeight,
 			&mintedAmount,
 			&burnedAmount,
+			&updatedScriptVersionsStr,
 		)
 		if err != nil {
 			return nil, err
@@ -130,28 +149,50 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 		metadata.Memo = memo
 		metadata.PlannedTotalAmount = plannedTotalAmount
 		metadata.Issuers = issuerTokens
+		metadata.PrivacyType = privacyType
 		metadata.MintThreshold = mintThreshold
+		metadata.ReregistrationExpireHeight = reRegistrationExpireHeight
 		metadata.ReregistrationThreshold = reregistrationThreshold
-		metadata.ExpireHeight = expireHeight
 		metadata.MintedAmount = mintedAmount
 		metadata.BurnedAmount = burnedAmount
+		updatedScriptVersions := strings.Split(updatedScriptVersionsStr, ",")
+		for i := 0; i < len(updatedScriptVersions); i++ {
+			version, err := strconv.Atoi(updatedScriptVersions[i])
+			if err != nil {
+				return nil, err
+			}
+			metadata.UpdateScriptVersions = append(metadata.UpdateScriptVersions, uint32(version))
+		}
 	}
 	return metadata, err
 }
 func UpdateCTAUTMetadata(metadata *Metadata) error {
-	stmt, err := db.Prepare(`UPDATE metadata SET memo = ?, planned_total_amount = ?, issuer_tokens = ?, mint_threshold = ?, reregistration_threshold = ?, expire_height = ?, minted_amount = ?, burned_amount = ? WHERE id = ?`)
+	stmt, err := db.Prepare(`UPDATE metadata SET version = ?,
+                    memo = ?, planned_total_amount = ?, 
+                    issuer_tokens = ?, privacy_type = ?, mint_threshold = ?, reregistration_threshold = ?,
+                    expire_height = ?, minted_amount = ?, burned_amount = ? ,update_script_versions = ? WHERE id = ?`)
 	if err != nil {
 		return err
 	}
+
+	updatedScriptVersions := make([]string, len(metadata.UpdateScriptVersions))
+	for i := 0; i < len(metadata.UpdateScriptVersions); i++ {
+		updatedScriptVersions[i] = strconv.Itoa(int(metadata.UpdateScriptVersions[i]))
+	}
+	updatedScriptVersionsStr := strings.Join(updatedScriptVersions, ",")
+
 	_, err = stmt.Exec(
+		metadata.Version,
 		metadata.Memo,
 		metadata.PlannedTotalAmount,
 		metadata.Issuers,
+		metadata.PrivacyType,
 		metadata.MintThreshold,
 		metadata.ReregistrationThreshold,
-		metadata.ExpireHeight,
+		metadata.ReregistrationExpireHeight,
 		metadata.MintedAmount,
 		metadata.BurnedAmount,
+		updatedScriptVersionsStr,
 		metadata.ID,
 	)
 	return err
@@ -376,6 +417,70 @@ func LoadTokenByPoint(accountID int64, txID string, index uint8) (*Token, error)
 
 }
 
+func LoadActiveRootTokens(identifier string) ([]*Token, error) {
+	rows, err := db.Query(`SELECT id,account_id,identifier,tx_id,output_index,is_root_token,token_type,version,value_script,value_pk,value_sk,value,status
+								 FROM ctaut  
+								WHERE identifier = ? AND is_root_token = ? AND (status = 1  OR status = 3)`,
+		identifier, true)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	tokens := make([]*Token, 0)
+	for rows.Next() {
+
+		var ID int64
+		var accountID int64
+		var identifier string
+		var txID string
+		var outputIndex uint8
+		var isRootToken bool
+		var tokenType uint8
+		var version uint32
+		var valueScript []byte
+		var cryptoValuePK []byte
+		var cryptoValueSK []byte
+		var value uint64
+		var status int
+
+		err = rows.Scan(
+			&ID,
+			&accountID,
+			&identifier,
+			&txID,
+			&outputIndex,
+			&isRootToken,
+			&tokenType,
+			&version,
+			&valueScript,
+			&cryptoValuePK,
+			&cryptoValueSK,
+			&value,
+			&status,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, &Token{
+			ID:            ID,
+			AccountID:     accountID,
+			Identifier:    identifier,
+			TxID:          txID,
+			Index:         outputIndex,
+			IsRootToken:   isRootToken,
+			TokenType:     tokenType,
+			Version:       version,
+			ValueScript:   valueScript,
+			CryptoValuePK: cryptoValuePK,
+			CryptoValueSK: cryptoValueSK,
+			Value:         value,
+			Status:        status,
+		})
+	}
+	return tokens, nil
+}
 func DisableRootToken(accountID int64, identifier string, txID string) ([]*Token, error) {
 	rows, err := db.Query(`SELECT id, tx_id, output_index,is_root_token,token_type,version,value_script,value_pk,value_sk,value,status
        							FROM ctaut  

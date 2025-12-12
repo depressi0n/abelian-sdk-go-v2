@@ -118,12 +118,14 @@ func init() {
     	
     	planned_total_amount INTEGER,
     	issuer_tokens TEXT,
+    	privacy_type INTEGER,
     	mint_threshold INTEGER,
     	reregistration_threshold INTEGER,
     	expire_height INTEGER,
     	
     	minted_amount INTEGER,
-    	burned_amount INTEGER)`)
+    	burned_amount INTEGER,
+    	update_script_versions TEXT)`)
 	if err != nil {
 		panic(err)
 	}
