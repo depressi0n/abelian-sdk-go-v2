@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/abesuite/abec/ctaut"
+	ctautapi "github.com/abesuite/abec/ctaut/api"
 	"github.com/pqabelian/abelian-sdk-go-v2/abelian/crypto"
 )
 
@@ -103,7 +103,7 @@ const (
 // - determine whether the coin belongs to the corresponding account
 // - generate serial number for specified coins
 type ViewAccount interface {
-	ReceiveCTAUTToken(version uint32, scriptType ctaut.AutScriptType, valueScript []byte,
+	ReceiveCTAUTToken(version uint32, scriptType ctautapi.AutScriptType, valueScript []byte,
 		txVersion uint32, txOutData []byte) (success bool, v uint64, tokenType crypto.AutTokenType,
 		coinValuePK []byte, coinValueSK []byte, err error)
 
@@ -242,7 +242,7 @@ func (account *RootSeedViewAccount) ReceiveCoin(txVersion uint32, txOutData []by
 	return success, v, nil
 }
 
-func (account *RootSeedViewAccount) ReceiveCTAUTToken(version uint32, scriptType ctaut.AutScriptType,
+func (account *RootSeedViewAccount) ReceiveCTAUTToken(version uint32, scriptType ctautapi.AutScriptType,
 	valueScript []byte, txVersion uint32, txOutData []byte) (success bool,
 	v uint64, tokenType crypto.AutTokenType,
 	cryptoValuePK []byte, cryptoValueSK []byte, err error) {
@@ -430,7 +430,7 @@ func (account *CryptoKeysViewAccount) ReceiveCoin(txVersion uint32, txOutData []
 	}
 	return success, v, nil
 }
-func (account *CryptoKeysViewAccount) ReceiveCTAUTToken(version uint32, scriptType ctaut.AutScriptType,
+func (account *CryptoKeysViewAccount) ReceiveCTAUTToken(version uint32, scriptType ctautapi.AutScriptType,
 	valueScript []byte, txVersion uint32, txOutData []byte) (success bool,
 	v uint64, tokenType crypto.AutTokenType,
 	coinValuePK []byte, coinValueSK []byte, err error) {

@@ -42,6 +42,11 @@ func (client *Client) GetRawTx(txID string) (res *Tx, err error) {
 	return res, err
 }
 
+func (client *Client) GetAutMetadata(indentifier string) (res *AutMetadata, err error) {
+	err = client.Do("getautmetadata", []interface{}{indentifier, true}, &res)
+	return res, err
+}
+
 func (client *Client) GetBlockByHeight(height int64) (res *Block, err error) {
 	blockID, err := client.GetBlockHash(height)
 	if err != nil {

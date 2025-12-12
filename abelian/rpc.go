@@ -95,3 +95,25 @@ type Tx struct {
 	Vin           []*TxVin  `json:"vin"`
 	Vout          []*TxVout `json:"vout"`
 }
+
+type AutMetadata struct {
+	Version                    uint32   `json:"version"`
+	AutIdentifier              string   `json:"identifier"`
+	AutName                    string   `json:"name"`
+	AutSymbol                  string   `json:"symbol"`
+	BaseUnitName               string   `json:"baseUnitName"`
+	SubUnitName                string   `json:"subUnitName"`
+	UnitScale                  uint64   `json:"unitScale"`
+	AutMemo                    string   `json:"autMemo"`
+	PlannedTotalSupply         uint64   `json:"plannedTotalSupply"`
+	Issuers                    []string `json:"issuers"`
+	ReregistrationExpireHeight int32    `json:"reRegistrationHeight"`
+	ReRegistrationThreshold    uint8    `json:"reRegistrationThreshold"`
+	MintThreshold              uint8    `json:"mintThreshold"`
+	PrivacyType                uint8    `json:"privacyType"`
+
+	MintedAmount         uint64     `json:"mintedAmount"`
+	BurnedAmount         uint64     `json:"burnedAmount"`
+	UpdateScriptVersions []uint32   `json:"updateScriptVersions"`
+	ActiveRootTokenSet   []OutPoint `json:"activeRootTokenSet"`
+}
