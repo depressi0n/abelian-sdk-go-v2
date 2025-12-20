@@ -33,6 +33,8 @@ type CTAUTMetadata struct {
 
 	AutIdentifier AutId
 
+	UpdatedHeight int32
+
 	AutName      string
 	AutSymbol    string
 	BaseUnitName string
@@ -51,16 +53,17 @@ type CTAUTMetadata struct {
 	BurnedAmount         uint64
 	ActiveRootTokenSet   map[OutPoint]struct{}
 	UpdateScriptVersions []uint32
+	UpdateHistoryHeights []int32
 }
 
-func RegisteredCTAUTMetadata(extScript *ExtAutScript) (*CTAUTMetadata, error) {
+func RegisteredCTAUTMetadata(extScript *ExtAutScript, blockHeight int64) (*CTAUTMetadata, error) {
 	if extScript == nil {
 		return nil, nil
 	}
 	if extScript.Type() != v2.AutScriptTypeRegistration {
 		return nil, fmt.Errorf("RegisteredCTAUTMetadata: the input script is not a registration script")
 	}
-	metadata, err := extScript.CreateAutMetadata()
+	metadata, err := extScript.CreateAutMetadata(int32(blockHeight))
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +83,7 @@ func RegisteredCTAUTMetadata(extScript *ExtAutScript) (*CTAUTMetadata, error) {
 	res := &CTAUTMetadata{
 		Version:                    metadata.Version,
 		AutIdentifier:              metadata.AutIdentifier,
+		UpdatedHeight:              metadata.UpdatedHeight,
 		AutName:                    hex.EncodeToString(metadata.AutName),
 		AutSymbol:                  hex.EncodeToString(metadata.AutSymbol),
 		BaseUnitName:               hex.EncodeToString(metadata.BaseUnitName),
@@ -96,11 +100,12 @@ func RegisteredCTAUTMetadata(extScript *ExtAutScript) (*CTAUTMetadata, error) {
 		BurnedAmount:               0,
 		ActiveRootTokenSet:         rootTokens,
 		UpdateScriptVersions:       metadata.UpdateScriptVersions,
+		UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 	}
 
 	return res, nil
 }
-func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetadata) (*CTAUTMetadata, error) {
+func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetadata, blockHeight int64) (*CTAUTMetadata, error) {
 	if extScript == nil {
 		return nil, nil
 	}
@@ -133,6 +138,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 
 		v2Metadata := &v2.Metadata{
 			Version:                    metadata.Version,
+			UpdatedHeight:              metadata.UpdatedHeight,
 			AutIdentifier:              metadata.AutIdentifier,
 			AutName:                    []byte(metadata.AutName),
 			AutSymbol:                  []byte(metadata.AutSymbol),
@@ -150,8 +156,9 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 			BurnedAmount:               metadata.BurnedAmount,
 			ActiveRootTokenSet:         activeRootTokenSet,
 			UpdateScriptVersions:       metadata.UpdateScriptVersions,
+			UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 		}
-		updateAutMetadata, err := extScript.UpdateAutMetadata(v2Metadata)
+		updateAutMetadata, err := extScript.UpdateAutMetadata(v2Metadata, int32(blockHeight))
 		if err != nil {
 			return nil, err
 		}
@@ -171,6 +178,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 		res := &CTAUTMetadata{
 			Version:                    updateAutMetadata.Version,
 			AutIdentifier:              updateAutMetadata.AutIdentifier,
+			UpdatedHeight:              updateAutMetadata.UpdatedHeight,
 			AutName:                    hex.EncodeToString(updateAutMetadata.AutName),
 			AutSymbol:                  hex.EncodeToString(updateAutMetadata.AutSymbol),
 			BaseUnitName:               hex.EncodeToString(updateAutMetadata.BaseUnitName),
@@ -187,6 +195,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 			BurnedAmount:               0,
 			ActiveRootTokenSet:         rootTokens,
 			UpdateScriptVersions:       metadata.UpdateScriptVersions,
+			UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 		}
 
 		return res, nil
@@ -194,6 +203,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 		copiedMetadata := &CTAUTMetadata{
 			Version:                    metadata.Version,
 			AutIdentifier:              metadata.AutIdentifier,
+			UpdatedHeight:              metadata.UpdatedHeight,
 			AutName:                    metadata.AutName,
 			AutSymbol:                  metadata.AutSymbol,
 			BaseUnitName:               metadata.BaseUnitName,
@@ -210,6 +220,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 			BurnedAmount:               metadata.BurnedAmount,
 			ActiveRootTokenSet:         metadata.ActiveRootTokenSet,
 			UpdateScriptVersions:       metadata.UpdateScriptVersions,
+			UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 		}
 
 		copiedMetadata.MintedAmount += instance.Vin()
@@ -218,6 +229,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 		copiedMetadata := &CTAUTMetadata{
 			Version:                    metadata.Version,
 			AutIdentifier:              metadata.AutIdentifier,
+			UpdatedHeight:              metadata.UpdatedHeight,
 			AutName:                    metadata.AutName,
 			AutSymbol:                  metadata.AutSymbol,
 			BaseUnitName:               metadata.BaseUnitName,
@@ -234,6 +246,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 			BurnedAmount:               metadata.BurnedAmount,
 			ActiveRootTokenSet:         metadata.ActiveRootTokenSet,
 			UpdateScriptVersions:       metadata.UpdateScriptVersions,
+			UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 		}
 
 		return copiedMetadata, nil
@@ -256,6 +269,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 		copiedMetadata := &CTAUTMetadata{
 			Version:                    metadata.Version,
 			AutIdentifier:              metadata.AutIdentifier,
+			UpdatedHeight:              metadata.UpdatedHeight,
 			AutName:                    metadata.AutName,
 			AutSymbol:                  metadata.AutSymbol,
 			BaseUnitName:               metadata.BaseUnitName,
@@ -272,6 +286,7 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 			BurnedAmount:               metadata.BurnedAmount,
 			ActiveRootTokenSet:         metadata.ActiveRootTokenSet,
 			UpdateScriptVersions:       metadata.UpdateScriptVersions,
+			UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 		}
 
 		copiedMetadata.BurnedAmount += burnedValue
