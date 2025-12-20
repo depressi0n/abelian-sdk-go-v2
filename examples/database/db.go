@@ -108,6 +108,7 @@ func init() {
     	registered_tx_id TEXT,
     	
     	version INTEGER,
+    	updated_height INTEGER,
     	identifier TEXT,
     	name TEXT,
     	symbol TEXT,
@@ -125,7 +126,8 @@ func init() {
     	
     	minted_amount INTEGER,
     	burned_amount INTEGER,
-    	update_script_versions TEXT)`)
+    	update_script_versions TEXT,
+    	update_history_heights TEXT)`)
 	if err != nil {
 		panic(err)
 	}

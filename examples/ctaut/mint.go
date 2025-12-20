@@ -82,11 +82,11 @@ func mintCTAUT(identifier abelian.AutId) {
 			HideValue:     false,
 		}
 
-		if metadata.PrivacyType == abelian.AutPrivacyTypeUnlimited {
+		if metadata.PrivacyType == uint8(abelian.AutPrivacyTypeUnlimited) {
 			// unlimited privacy type, all recipients are public / hidden
-		} else if metadata.PrivacyType == abelian.AutPrivacyTypeLimitedPublic {
+		} else if metadata.PrivacyType == uint8(abelian.AutPrivacyTypeLimitedPublic) {
 			recipient.HideValue = false
-		} else if metadata.PrivacyType == abelian.AutPrivacyTypeLimitedHidden {
+		} else if metadata.PrivacyType == uint8(abelian.AutPrivacyTypeLimitedHidden) {
 			recipient.HideValue = true
 		} else {
 			panic("unsupported privacy type")

@@ -39,7 +39,7 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 
 		switch extAutScript.Type() {
 		case abelian.CTAUTTypeRegistration:
-			metadata, err := abelian.RegisteredCTAUTMetadata(extAutScript)
+			metadata, err := abelian.RegisteredCTAUTMetadata(extAutScript, blockHeight)
 			if err != nil {
 				return err
 			}
@@ -74,6 +74,7 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 				RegisteredTxID:             tx.TxID,
 				Version:                    metadata.Version,
 				Identifier:                 metadata.AutIdentifier.String(),
+				UpdatedHeight:              metadata.UpdatedHeight,
 				Name:                       metadata.AutName,
 				Symbol:                     metadata.AutSymbol,
 				BaseUnitName:               metadata.BaseUnitName,
@@ -88,6 +89,7 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 				MintedAmount:               0,
 				BurnedAmount:               0,
 				UpdateScriptVersions:       metadata.UpdateScriptVersions,
+				UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 			}
 			_, err = database.InsertCTAUTInstance(dbMetadata)
 			if err != nil {
@@ -126,6 +128,7 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 			ctAUTMetadata := &abelian.CTAUTMetadata{
 				Version:                    metadata.Version,
 				AutIdentifier:              identifier,
+				UpdatedHeight:              metadata.UpdatedHeight,
 				AutName:                    metadata.Name,
 				AutSymbol:                  metadata.Symbol,
 				BaseUnitName:               metadata.BaseUnitName,
@@ -137,13 +140,14 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 				ReregistrationExpireHeight: metadata.ReregistrationExpireHeight,
 				ReregistrationThreshold:    metadata.ReregistrationThreshold,
 				MintThreshold:              metadata.MintThreshold,
-				PrivacyType:                metadata.PrivacyType,
+				PrivacyType:                abelian.AutPrivacyType(metadata.PrivacyType),
 				MintedAmount:               metadata.MintedAmount,
 				BurnedAmount:               metadata.BurnedAmount,
 				ActiveRootTokenSet:         activeRootTokenSet,
 				UpdateScriptVersions:       metadata.UpdateScriptVersions,
+				UpdateHistoryHeights:       metadata.UpdateHistoryHeights,
 			}
-			updatedAUTMetadata, err := abelian.UpdateMetadataFromCTAUTScript(extAutScript, ctAUTMetadata)
+			updatedAUTMetadata, err := abelian.UpdateMetadataFromCTAUTScript(extAutScript, ctAUTMetadata, blockHeight)
 			if err != nil {
 				fmt.Errorf("fail to update instance: %s", err)
 				return err
@@ -161,6 +165,7 @@ func ScanCoins(viewAccounts []*database.ViewAccount, tx *abelian.Tx, isCoinbaseT
 			metadata.MintedAmount = updatedAUTMetadata.MintedAmount
 			metadata.BurnedAmount = updatedAUTMetadata.BurnedAmount
 			metadata.UpdateScriptVersions = updatedAUTMetadata.UpdateScriptVersions
+			metadata.UpdateHistoryHeights = updatedAUTMetadata.UpdateHistoryHeights
 
 			// update instance to database
 			err = database.UpdateCTAUTMetadata(metadata)

@@ -29,14 +29,14 @@ func SignRawTransactionForCTAUT(unsignedRawTx *abelian.UnsignedRawTx, senderAcco
 }
 func main() {
 	// 1. register
-	//registerCTAUT()
+	registerCTAUT()
 
 	// fill in the txid
-	identifier, err := abelian.NewAutId("5a1773d1f02a20397b5ac06f90e2a06271eda3e4fe69b64d835571ada1c12f06")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("identifier: ", identifier.String())
+	//identifier, err := abelian.NewAutId("a65d71c793b27a5de0f884d446d1a5443b60a77e81d4d037815bea16a87288a5")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println("identifier: ", identifier.String())
 
 	// 2. reregister
 	//reRegisterCTAUT(identifier)
@@ -48,5 +48,5 @@ func main() {
 	//transferCTAUT(identifier)
 
 	// 5. burn
-	burnCTAUT(identifier)
+	//burnCTAUT(identifier)
 }

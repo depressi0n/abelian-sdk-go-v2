@@ -9,13 +9,15 @@ type Metadata struct {
 	ID             int64
 	RegisteredTxID string
 	Version        uint32
-	Identifier     string
-	Name           string
-	Symbol         string
-	BaseUnitName   string
-	SubUnitName    string
-	UnitScale      uint64
-	Memo           string
+
+	UpdatedHeight int32
+	Identifier    string
+	Name          string
+	Symbol        string
+	BaseUnitName  string
+	SubUnitName   string
+	UnitScale     uint64
+	Memo          string
 
 	PlannedTotalAmount         uint64
 	Issuers                    string
@@ -28,6 +30,7 @@ type Metadata struct {
 	BurnedAmount uint64
 
 	UpdateScriptVersions []uint32
+	UpdateHistoryHeights []int32
 }
 
 func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
@@ -46,8 +49,8 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 		return id, err
 	}
 
-	stmt, err := db.Prepare(`INSERT INTO metadata (registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,privacy_type,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount,update_script_versions) 
-									VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := db.Prepare(`INSERT INTO metadata (registered_tx_id,version,updated_height,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,privacy_type,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount,update_script_versions,update_history_heights) 
+									VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return -1, err
 	}
@@ -56,9 +59,17 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 		updateScriptVersions[i] = strconv.Itoa(int(metadata.UpdateScriptVersions[i]))
 	}
 	updateScriptVersionsStr := strings.Join(updateScriptVersions, ",")
+
+	updateScriptHeights := make([]string, len(metadata.UpdateHistoryHeights))
+	for i := 0; i < len(metadata.UpdateHistoryHeights); i++ {
+		updateScriptHeights[i] = strconv.Itoa(int(metadata.UpdateHistoryHeights[i]))
+	}
+	updateScriptHeightsStr := strings.Join(updateScriptHeights, ",")
+
 	result, err := stmt.Exec(
 		metadata.RegisteredTxID,
 		metadata.Version,
+		metadata.UpdatedHeight,
 		metadata.Identifier,
 		metadata.Name,
 		metadata.Symbol,
@@ -75,6 +86,7 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 		metadata.MintedAmount,
 		metadata.BurnedAmount,
 		updateScriptVersionsStr,
+		updateScriptHeightsStr,
 	)
 	if err != nil {
 		return -1, err
@@ -82,7 +94,7 @@ func InsertCTAUTInstance(metadata *Metadata) (int64, error) {
 	return result.LastInsertId()
 }
 func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
-	rows, err := db.Query(`SELECT id,registered_tx_id,version,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,privacy_type,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount,update_script_versions
+	rows, err := db.Query(`SELECT id,registered_tx_id,version,updated_height,identifier,name,symbol,base_unit_name,sub_unit_name,unit_scale,memo,planned_total_amount,issuer_tokens,privacy_type,mint_threshold,reregistration_threshold,expire_height,minted_amount,burned_amount,update_script_versions,update_history_heights
 								 FROM metadata  
 								WHERE identifier = ?`, identifier)
 	if err != nil {
@@ -95,6 +107,7 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 		var id int64
 		var registeredTxID string
 		var version uint32
+		var updatedHeight int32
 		var identifier string
 		var name string
 		var symbol string
@@ -111,11 +124,13 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 		var mintedAmount uint64
 		var burnedAmount uint64
 		var updatedScriptVersionsStr string
+		var updatedScriptHeightsStr string
 
 		err = rows.Scan(
 			&id,
 			&registeredTxID,
 			&version,
+			&updatedHeight,
 			&identifier,
 			&name,
 			&symbol,
@@ -132,6 +147,7 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 			&mintedAmount,
 			&burnedAmount,
 			&updatedScriptVersionsStr,
+			&updatedScriptHeightsStr,
 		)
 		if err != nil {
 			return nil, err
@@ -140,6 +156,7 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 		metadata.ID = id
 		metadata.RegisteredTxID = registeredTxID
 		metadata.Version = version
+		metadata.UpdatedHeight = updatedHeight
 		metadata.Identifier = identifier
 		metadata.Name = name
 		metadata.Symbol = symbol
@@ -163,14 +180,23 @@ func LoadCTAUTMetadata(identifier string) (*Metadata, error) {
 			}
 			metadata.UpdateScriptVersions = append(metadata.UpdateScriptVersions, uint32(version))
 		}
+		updatedScriptHeights := strings.Split(updatedScriptHeightsStr, ",")
+		for i := 0; i < len(updatedScriptHeights); i++ {
+			height, err := strconv.Atoi(updatedScriptHeights[i])
+			if err != nil {
+				return nil, err
+			}
+			metadata.UpdateHistoryHeights = append(metadata.UpdateHistoryHeights, int32(height))
+		}
 	}
 	return metadata, err
 }
 func UpdateCTAUTMetadata(metadata *Metadata) error {
-	stmt, err := db.Prepare(`UPDATE metadata SET version = ?,
+	stmt, err := db.Prepare(`UPDATE metadata SET version = ?,updated_height = ?,
                     memo = ?, planned_total_amount = ?, 
                     issuer_tokens = ?, privacy_type = ?, mint_threshold = ?, reregistration_threshold = ?,
-                    expire_height = ?, minted_amount = ?, burned_amount = ? ,update_script_versions = ? WHERE id = ?`)
+                    expire_height = ?, minted_amount = ?, burned_amount = ? ,update_script_versions = ?, update_history_heights = ? 
+                WHERE id = ?`)
 	if err != nil {
 		return err
 	}
@@ -181,8 +207,15 @@ func UpdateCTAUTMetadata(metadata *Metadata) error {
 	}
 	updatedScriptVersionsStr := strings.Join(updatedScriptVersions, ",")
 
+	updatedScriptHeights := make([]string, len(metadata.UpdateHistoryHeights))
+	for i := 0; i < len(metadata.UpdateHistoryHeights); i++ {
+		updatedScriptHeights[i] = strconv.Itoa(int(metadata.UpdateHistoryHeights[i]))
+	}
+	updatedScriptHeightsStr := strings.Join(updatedScriptHeights, ",")
+
 	_, err = stmt.Exec(
 		metadata.Version,
+		metadata.UpdatedHeight,
 		metadata.Memo,
 		metadata.PlannedTotalAmount,
 		metadata.Issuers,
@@ -193,6 +226,7 @@ func UpdateCTAUTMetadata(metadata *Metadata) error {
 		metadata.MintedAmount,
 		metadata.BurnedAmount,
 		updatedScriptVersionsStr,
+		updatedScriptHeightsStr,
 		metadata.ID,
 	)
 	return err
@@ -420,7 +454,7 @@ func LoadTokenByPoint(accountID int64, txID string, index uint8) (*Token, error)
 func LoadActiveRootTokens(identifier string) ([]*Token, error) {
 	rows, err := db.Query(`SELECT id,account_id,identifier,tx_id,output_index,is_root_token,token_type,version,value_script,value_pk,value_sk,value,status
 								 FROM ctaut  
-								WHERE identifier = ? AND is_root_token = ? AND (status = 1  OR status = 3)`,
+								WHERE identifier = ? AND is_root_token = ? AND (status = 1 OR status = 2 OR status = 3)`,
 		identifier, true)
 	if err != nil {
 		return nil, err
