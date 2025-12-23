@@ -84,7 +84,7 @@ func RegisteredCTAUTMetadata(extScript *ExtAutScript, blockHeight int64) (*CTAUT
 		Version:                    metadata.Version,
 		AutIdentifier:              metadata.AutIdentifier,
 		UpdatedHeight:              metadata.UpdatedHeight,
-		AutName:                    hex.EncodeToString(metadata.AutName),
+		AutName:                    hex.EncodeToString(metadata.AutName), // []byte -> string
 		AutSymbol:                  hex.EncodeToString(metadata.AutSymbol),
 		BaseUnitName:               hex.EncodeToString(metadata.BaseUnitName),
 		SubUnitName:                hex.EncodeToString(metadata.SubUnitName),
@@ -136,16 +136,37 @@ func UpdateMetadataFromCTAUTScript(extScript *ExtAutScript, metadata *CTAUTMetad
 			activeRootTokenSet[v2Outpoint.String()] = v2Outpoint
 		}
 
+		autName, err := hex.DecodeString(metadata.AutName)
+		if err != nil {
+			return nil, err
+		}
+		autSymbol, err := hex.DecodeString(metadata.AutSymbol)
+		if err != nil {
+			return nil, err
+		}
+		baseUnitName, err := hex.DecodeString(metadata.BaseUnitName)
+		if err != nil {
+			return nil, err
+		}
+		subUnitName, err := hex.DecodeString(metadata.SubUnitName)
+		if err != nil {
+			return nil, err
+		}
+		autMemo, err := hex.DecodeString(metadata.AutMemo)
+		if err != nil {
+			return nil, err
+		}
+
 		v2Metadata := &v2.Metadata{
 			Version:                    metadata.Version,
 			UpdatedHeight:              metadata.UpdatedHeight,
 			AutIdentifier:              metadata.AutIdentifier,
-			AutName:                    []byte(metadata.AutName),
-			AutSymbol:                  []byte(metadata.AutSymbol),
-			BaseUnitName:               []byte(metadata.BaseUnitName),
-			SubUnitName:                []byte(metadata.SubUnitName),
+			AutName:                    autName,
+			AutSymbol:                  autSymbol,
+			BaseUnitName:               baseUnitName,
+			SubUnitName:                subUnitName,
 			UnitScale:                  metadata.UnitScale,
-			AutMemo:                    []byte(metadata.AutMemo),
+			AutMemo:                    autMemo,
 			PlannedTotalSupply:         metadata.PlannedTotalSupply,
 			Issuers:                    v2Issuers,
 			PrivacyType:                metadata.PrivacyType,
