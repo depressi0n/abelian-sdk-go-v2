@@ -36,25 +36,29 @@ type ChainInfo struct {
 }
 
 type Block struct {
-	Height        int64    `json:"height"`
-	Confirmations int64    `json:"confirmations"`
-	Version       int64    `json:"version"`
-	VersionHex    string   `json:"versionHex"`
-	Time          int64    `json:"time"`
-	Nonce         uint64   `json:"nonce"`
-	Size          int64    `json:"size"`
-	FullSize      int64    `json:"fullsize"`
-	Difficulty    float64  `json:"difficulty"`
-	BlockHash     string   `json:"hash"`
-	PrevBlockHash string   `json:"previousblockhash"`
-	NextBlockHash string   `json:"nextblockhash"`
-	ContentHash   string   `json:"contenthash"`
-	MerkleRoot    string   `json:"merkleroot"`
-	Bits          string   `json:"bits"`
-	SealHash      string   `json:"sealhash"`
-	Mixdigest     string   `json:"mixdigest"`
-	TxHashes      []string `json:"tx"`
-	RawTxs        []*Tx    `json:"rawTx"`
+	Height           int64    `json:"height"`
+	Confirmations    int64    `json:"confirmations"`
+	Version          int64    `json:"version"`
+	VersionHex       string   `json:"versionHex"`
+	Time             int64    `json:"time"`
+	Nonce            uint64   `json:"nonce"`
+	Size             int64    `json:"size"`
+	FullSize         int64    `json:"fullsize"`
+	Difficulty       float64  `json:"difficulty"`
+	DifficultySecond float64  `json:"difficultySecond"`
+	BlockHash        string   `json:"hash"`
+	PrevBlockHash    string   `json:"previousblockhash"`
+	NextBlockHash    string   `json:"nextblockhash"`
+	ContentHash      string   `json:"contenthash"`
+	MerkleRoot       string   `json:"merkleroot"`
+	Bits             string   `json:"bits"`
+	BitsSecond       string   `json:"bitsSecond"`
+	PowScaleSecond   uint32   `json:"powScaleSecond"`
+	ConsensusApplied uint8    `json:"consensusApplied"`
+	SealHash         string   `json:"sealhash"`
+	Mixdigest        string   `json:"mixdigest"`
+	TxHashes         []string `json:"tx"`
+	RawTxs           []*Tx    `json:"rawTx"`
 }
 
 type TxVin struct {
