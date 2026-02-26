@@ -5,7 +5,7 @@ go 1.23.2
 toolchain go1.23.4
 
 require (
-	github.com/abesuite/abec v1.0.1-0.20251222145851-4813fe61dca5
+	github.com/abesuite/abec v1.0.1-0.20260225133126-51dfdf1df906
 	github.com/jrick/logrotate v1.0.0
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/pqabelian/abelian-aip11-go v0.0.0-20251105063917-baa94431c9cb
@@ -20,7 +20,7 @@ require (
 	github.com/cryptosuite/kyber-go v0.0.2-beta // indirect
 	github.com/cryptosuite/liboqs-go v0.9.5-alpha // indirect
 	github.com/cryptosuite/pqringct v0.14.0 // indirect
-	github.com/cryptosuite/pqringctx v0.14.0 // indirect
+	github.com/cryptosuite/pqringctx v0.14.1-0.20260213134758-cb13ce080504 // indirect
 	github.com/cryptosuite/salrs-go v0.0.0-20200918155434-c02eea3b36d1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/lru v1.0.0 // indirect
