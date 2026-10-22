@@ -11,7 +11,7 @@ import (
 )
 
 func MessageSignatureSign(account *RootSeedAccount, abelAddress []byte, message []byte) ([]byte, error) {
-	if account.privacyLevel == crypto.PrivacyLevelFullPrivacyPre || account.privacyLevel == crypto.PrivacyLevelFullPrivacyRand {
+	if account.privacyLevel == crypto.PrivacyLevelFullPrivacyPre {
 		return nil, errors.New("unsupported operation for full privacy account")
 	}
 	if len(message) == 0 {
@@ -51,12 +51,14 @@ func MessageSignatureSign(account *RootSeedAccount, abelAddress []byte, message 
 		return nil, errors.New("invalid address")
 	}
 
+	coinAddress := cryptoAddress.GetCoinAddress()
 	// message
 	message = append(message, crypto.SerializeCryptoScheme(account.cryptoScheme)...)
 	message = append(message, byte(account.privacyLevel))
 
 	// make message signature
-	messageSig, err := pp.MessageSignatureSign(message[:], cryptoSpendSecretKey)
+	coinSpendSecretKey := cryptoSpendSecretKey[5:]
+	messageSig, err := pp.MessageSignatureSign(message[:], coinAddress.Data(), coinSpendSecretKey)
 	if err != nil {
 		return nil, err
 	}

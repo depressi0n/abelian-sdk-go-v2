@@ -49,9 +49,9 @@ func main() {
 	for _, x := range []struct {
 		abelian.AccountPrivacyLevel
 	}{
-		//{
-		//	abelian.AccountPrivacyLevelFullPrivacy,
-		//},
+		{
+			abelian.AccountPrivacyLevelFullPrivacy,
+		},
 		{
 			abelian.AccountPrivacyLevelPseudonym,
 		},
